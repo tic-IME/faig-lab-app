@@ -32,14 +32,17 @@ window.Auth = (function () {
   // ── Login UI ──────────────────────────────────────────────
 
   function _showLoginUI() {
-    document.getElementById('app-login').style.display = '';
-    document.getElementById('app-main').style.display  = 'none';
-
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      setTimeout(_showLoginUI, 200);
+      return;
+    }
     _tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: FAIG_CONFIG.GOOGLE_CLIENT_ID,
-      scope:     FAIG_CONFIG.OAUTH_SCOPE,
-      callback:  _handleTokenResponse,
+      scope: FAIG_CONFIG.OAUTH_SCOPE,
+      callback: _handleTokenResponse,
     });
+    document.getElementById('app-login').style.display = 'flex';
+    document.getElementById('app-main').style.display = 'none';
   }
 
   // ── Token response ────────────────────────────────────────
