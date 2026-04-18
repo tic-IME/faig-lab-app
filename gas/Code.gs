@@ -134,7 +134,7 @@ function validateToken(accessToken) {
 
     for (var i = 0; i < data.length; i++) {
       var u = data[i];
-      if (u['Email_Usuari'] === info.email && String(u['Autoritzat_Laser']).toUpperCase() !== 'FALSE') {
+      if (u['Email_Usuari'].toString().trim().toLowerCase() === info.email.toString().trim().toLowerCase() && String(u['Autoritzat_Laser']).toUpperCase() !== 'FALSE') {
         return {
           email:             u['Email_Usuari'],
           nom:               u['Nom_Usuari'],
