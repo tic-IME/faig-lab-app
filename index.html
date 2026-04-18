@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAIG Lab — Institut Maria Espinalt</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- ── Pantalla Login ─────────────────────────────────── -->
+  <div id="app-login">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="logo-icon">⚙</span>
+        <h1 class="logo-text">FAIG Lab</h1>
+      </div>
+      <p class="login-centre">Institut Maria Espinalt</p>
+      <p class="login-desc">Accedeix amb el teu compte Google del centre</p>
+
+      <button class="btn-google" onclick="Auth.login()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          <path fill="none" d="M0 0h48v48H0z"/>
+        </svg>
+        Continua amb Google
+      </button>
+
+      <p id="login-error" class="login-error" style="display:none;"></p>
+    </div>
+  </div>
+
+  <!-- ── App Principal ──────────────────────────────────── -->
+  <div id="app-main" style="display:none;">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">⚙</span>
+        <span class="logo-text">FAIG Lab</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" data-module="calendari" href="#calendari">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">Calendari</span>
+        </a>
+        <a class="nav-item" data-module="reserves" href="#reserves">
+          <span class="nav-icon">🔖</span>
+          <span class="nav-label">Reserves</span>
+        </a>
+        <a class="nav-item" data-module="maquines" href="#maquines">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-label">Màquines</span>
+        </a>
+        <a class="nav-item" data-module="incidencies" href="#incidencies">
+          <span class="nav-icon">⚠️</span>
+          <span class="nav-label">Incidències</span>
+        </a>
+        <a class="nav-item" data-module="inventari" href="#inventari">
+          <span class="nav-icon">📦</span>
+          <span class="nav-label">Inventari</span>
+        </a>
+        <a id="nav-dashboard" class="nav-item" data-module="dashboard" href="#dashboard" style="display:none;">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <span id="user-name" class="user-name"></span>
+          <span id="user-role" class="user-role badge"></span>
+        </div>
+        <button class="btn-logout" onclick="Auth.logout()">Sortir</button>
+      </div>
+    </aside>
+
+    <!-- Contingut principal -->
+    <main id="app-content">
+      <div id="module-loading" class="spinner-wrap">
+        <div class="spinner"></div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/modules/calendari.js"></script>
+  <script src="js/modules/reserves.js"></script>
+  <script src="js/modules/maquines.js"></script>
+  <script src="js/modules/incidencies.js"></script>
+  <script src="js/modules/inventari.js"></script>
+  <script src="js/modules/dashboard.js"></script>
+  <script>
+    const MODULES = {
+      calendari:   window.ModulCalendari,
+      reserves:    window.ModulReserves,
+      maquines:    window.ModulMaquines,
+      incidencies: window.ModulIncidencies,
+      inventari:   window.ModulInventari,
+      dashboard:   window.ModulDashboard,
+    };
+
+    function loadModule(name) {
+      const content = document.getElementById('app-content');
+
+      // Marca nav-item actiu
+      document.querySelectorAll('.nav-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.module === name);
+      });
+
+      // Mostra spinner
+      content.innerHTML = '<div id="module-loading" class="spinner-wrap"><div class="spinner"></div></div>';
+
+      const mod = MODULES[name];
+      if (mod && typeof mod.init === 'function') {
+        mod.init(content);
+      } else {
+        content.innerHTML = '<div class="module-placeholder"><p>Mòdul <strong>' + name + '</strong> no disponible.</p></div>';
+      }
+    }
+
+    // Listeners nav
+    document.querySelectorAll('.nav-item[data-module]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.preventDefault();
+        const mod = el.dataset.module;
+        window.location.hash = mod;
+        loadModule(mod);
+      });
+    });
+
+    // Inicialització Auth
+    Auth.init(function(user) {
+      // Emplena dades usuari
+      document.getElementById('user-name').textContent = user.nom || user.email;
+      document.getElementById('user-role').textContent = user.nivell;
+
+      // Mostra dashboard si ADMIN
+      if (user.nivell === 'ADMIN') {
+        document.getElementById('nav-dashboard').style.display = '';
+      }
+
+      // Mostra app, oculta login
+      document.getElementById('app-login').style.display = 'none';
+      document.getElementById('app-main').style.display = '';
+
+      // Carrega mòdul per hash o per defecte
+      const hash = window.location.hash.replace('#', '');
+      loadModule(hash || 'calendari');
+    });
+  </script>
+
+</body>
+</html>
