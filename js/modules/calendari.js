@@ -39,6 +39,7 @@ window.ModulCalendari = (function () {
 
       _horaris  = { [TALLERS[0]]: hor1 || [], [TALLERS[1]]: hor2 || [] };
       _reserves = reservesRaw || [];
+      console.log('RESERVES CARREGADES:', _reserves);
 
       _renderSetmana();
     } catch (err) {
