@@ -222,7 +222,7 @@ window.ModulReserves = (function () {
           body.innerHTML = '<p class="text-danger">No s\'ha pogut carregar el protocol.</p>';
           return;
         }
-        _renderItems(res.maquina, res.items);
+        _renderItems(res.maquina_id, res.items);
       })
       .catch(function () {
         body.innerHTML = '<p class="text-danger">Error de connexió.</p>';
@@ -241,8 +241,8 @@ window.ModulReserves = (function () {
       </p>
       <div class="list-group list-group-flush">
         ${items.map(function (item, i) {
-          const titol = item.titol || item;
-          const desc  = item.descripcio || '';
+          const titol = item.Text_Item || item.titol || String(item);
+          const desc  = item.Bloc || item.descripcio || '';
           return `
           <label class="list-group-item list-group-item-action d-flex gap-3 py-3" for="chk-${i}">
             <input class="form-check-input flex-shrink-0 checklist-cb" type="checkbox" id="chk-${i}">
