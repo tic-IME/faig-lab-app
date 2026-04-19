@@ -285,6 +285,10 @@ window.ModulReserves = (function () {
       inici:          _pendingRes.inici,
       fi:             _pendingRes.fi,
       notes:          notes,
+      reserva_id:     '',
+      id_protocol:    _pendingRes.maquina_id,
+      bloc_completat: 'INICI,DURANT,TANCAMENT',
+      items_total:    document.querySelectorAll('.checklist-cb').length,
       items_validats: items,
     }).then(function (res) {
       _hideModal('checklist-modal');
