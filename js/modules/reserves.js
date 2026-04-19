@@ -295,7 +295,7 @@ window.ModulReserves = (function () {
       _pendingRes = null;
       btnOk.disabled    = false;
       btnOk.textContent = 'Confirmar reserva';
-      if (res.ok) {
+    if (res.registrat || res.ok) {
         _toast('Reserva creada correctament! ✓', 'success');
         _calendar && _calendar.refetchEvents();
       } else {
