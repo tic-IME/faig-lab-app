@@ -139,16 +139,16 @@ window.ModulCalendari = (function () {
 
     const teReserva = _reserves.some(function (r) {
       return r['Data_Reserva'] === diaStr &&
-             _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller)
+             _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller) &&
              ['confirmada', 'aprovada', 'pendent_permís'].indexOf(r['Estat_Reserva']) !== -1 &&
              _timesOverlap(r['Hora_Inici'], r['Hora_Final'], hora, horaFi)
 
     const reservaObj = teReserva
       ? _reserves.find(function (r) {
           return r['Data_Reserva'] === diaStr &&
-                 _ubicacioEsTaller(r['ubicacio'] || r['ID_Maquina'], taller) &&
+                 _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller) &&
                  ['confirmada', 'aprovada', 'pendent_permís'].indexOf(r['Estat_Reserva']) !== -1 &&
-                 _timesOverlap(r['Hora_Inici'], r['Hora_Fi'], hora, horaFi);
+                 _timesOverlap(r['Hora_Inici'], r['Hora_Final'], hora, horaFi);
         })
       : null;
 
