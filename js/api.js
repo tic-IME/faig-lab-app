@@ -204,3 +204,17 @@ window.API = (function () {
   };
 
 })();
+
+
+
+// Protocols de seguretat
+if (typeof API !== 'undefined') {
+  API.protocols = {
+    get: function(maquinaId) {
+      return API._post({ action: 'getProtocol', maquina_id: maquinaId });
+    },
+    registreChecklist: function(data) {
+      return API._post(Object.assign({ action: 'registreChecklist' }, data));
+    },
+  };
+}
