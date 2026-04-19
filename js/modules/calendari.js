@@ -170,7 +170,7 @@ window.ModulCalendari = (function () {
     }
 
     // Classe programada
-    if (teClasse) {
+    if (teClasse && classeObj && classeObj['Assignatura_Grup']) {
       return '<td style="background:#dbeafe;font-size:.72rem;padding:.3rem .5rem;vertical-align:top;">' +
              '<strong style="color:#1e40af;">' + (classeObj['Assignatura_Grup'] || '') + '</strong>' +
              '<br><small style="color:#1e40af;opacity:.8;">' + (classeObj['Professor_titular'] || '') + '</small>' +
