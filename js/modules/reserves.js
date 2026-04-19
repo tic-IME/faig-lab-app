@@ -218,7 +218,7 @@ window.ModulReserves = (function () {
 
     API.protocols.get(maquinaId)
       .then(function (res) {
-        if (!res.ok || !res.items || !res.items.length) {
+        if (!res.items || !res.items.length) {
           body.innerHTML = '<p class="text-danger">No s\'ha pogut carregar el protocol.</p>';
           return;
         }
