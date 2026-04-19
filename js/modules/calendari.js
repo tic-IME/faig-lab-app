@@ -139,7 +139,7 @@ window.ModulCalendari = (function () {
     });
 
     const teReserva = _reserves.some(function (r) {
-      console.log('DATA RESERVA:', r['Data_Reserva'], 'DIASTR:', diaStr);
+      console.log('DATA:', r['Data_Reserva'], 'TOKEN:', r['Token_Permis'], 'ID_MAQ:', r['ID_Maquina'], 'ESTAT:', r['Estat_Reserva']);
       return r['Data_Reserva'] === diaStr &&
              _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller) &&
              ['confirmada', 'aprovada', 'pendent_permis'].indexOf(r['Estat_Reserva']) !== -1 &&
