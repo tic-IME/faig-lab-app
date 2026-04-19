@@ -148,11 +148,18 @@ window.ModulReserves = (function () {
       <label class="form-label mt-2">Màquina:</label>
       <select id="sel-maquina" class="form-select">
         <option value="">— Escull una màquina —</option>
-        <option value="laser">Talladora làser</option>
-        <option value="impressio3d">Impressora 3D</option>
-        <option value="ploter">Plòter de tall</option>
-        <option value="brodadora">Brodadora</option>
-        <option value="escaner">Escàner 3D</option>
+        <option value="LASER-FLUX-01">Talladora Làser FLUX</option>
+        <option value="LASER-CRFA-01">Talladora Làser Falcon</option>
+        <option value="3D-ENDER-01">Impressora 3D Ender-01 (T1)</option>
+        <option value="3D-ENDER-02">Impressora 3D Ender-02 (T1)</option>
+        <option value="3D-ENDER-03">Impressora 3D Ender-03 (T1)</option>
+        <option value="3D-ENDER-04">Impressora 3D Ender-04 (T2)</option>
+        <option value="3D-ENDER-05">Impressora 3D Ender-05 (T2)</option>
+        <option value="3D-SOVOL-01">Impressora 3D Sovol-01 (T2)</option>
+        <option value="3D-SOVOL-02">Impressora 3D Sovol-02 (T2)</option>
+        <option value="PLOT-SILH-01">Plòter de Tall</option>
+        <option value="BROD-EMB-01">Brodadora</option>
+        <option value="3DSCAN-LIZARD-02">Escàner 3D</option>
       </select>
     `;
     document.getElementById('res-modal-ok').onclick = function () {
