@@ -122,11 +122,7 @@ window.ModulCalendari = (function () {
     if (body) body.innerHTML = html;
 
     // Event listeners a les cel·les clicables
-    _container.querySelectorAll('.cal-cel-buida').forEach(function (cel) {
-      cel.addEventListener('click', function () {
-        _obreModalReserva(cel.dataset.taller, cel.dataset.dia, cel.dataset.hora);
-      });
-    });
+   // Calendari només informatiu - reserves es fan des del mòdul Reserves
   }
 
   // ── Cel·la ────────────────────────────────────────────────
