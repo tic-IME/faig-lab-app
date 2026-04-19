@@ -210,11 +210,11 @@ window.API = (function () {
 // Protocols de seguretat
 if (typeof API !== 'undefined') {
   API.protocols = {
-    get: function(maquinaId) {
-      return API.call({ action: 'getProtocol', maquina_id: maquinaId });
+get: function(maquinaId) {
+      return API.call('getProtocol', { maquina_id: maquinaId });
     },
     registreChecklist: function(data) {
-      return API.call(Object.assign({ action: 'registreChecklist' }, data));
+      return API.call('registreChecklist', data);
     },
   };
 }
