@@ -211,10 +211,10 @@ window.API = (function () {
 if (typeof API !== 'undefined') {
   API.protocols = {
     get: function(maquinaId) {
-      return API._post({ action: 'getProtocol', maquina_id: maquinaId });
+      return API.call({ action: 'getProtocol', maquina_id: maquinaId });
     },
     registreChecklist: function(data) {
-      return API._post(Object.assign({ action: 'registreChecklist' }, data));
+      return API.call(Object.assign({ action: 'registreChecklist' }, data));
     },
   };
 }

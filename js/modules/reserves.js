@@ -120,7 +120,7 @@ window.ModulReserves = (function () {
   }
 
   function _fetchEvents(info, successCb, failureCb) {
-    API._post({ action: 'getReserves', start: info.startStr, end: info.endStr })
+    API.call({ action: 'getReserves', start: info.startStr, end: info.endStr })
       .then(function (res) {
         if (!res.ok) { failureCb(res.error || 'Error'); return; }
         successCb((res.reserves || []).map(function (r) {
@@ -188,7 +188,7 @@ window.ModulReserves = (function () {
     if (pot) {
       document.getElementById('btn-cancel-res').addEventListener('click', function () {
         if (!confirm('Segur que vols cancel·lar aquesta reserva?')) return;
-        API._post({ action: 'cancelReserva', id: info.event.id }).then(function (res) {
+        API.call({ action: 'cancelReserva', id: info.event.id }).then(function (res) {
           _hideModal('res-modal');
           if (res.ok) { _toast('Reserva cancel·lada.', 'success'); _calendar.refetchEvents(); }
           else { _toast(res.error || 'Error.', 'danger'); }
