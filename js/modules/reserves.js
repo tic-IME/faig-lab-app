@@ -123,7 +123,7 @@ window.ModulReserves = (function () {
     API.call('getReserves', { start: info.startStr, end: info.endStr })
       .then(function (res) {
         if (!res.ok) { failureCb(res.error || 'Error'); return; }
-        successCb((res.reserves || []).map(function (r) {
+       successCb((Array.isArray(res) ? res : (res.reserves || [])).map(function (r) {
           return {
             id:              r.id,
             title:           (r.maquina || '') + (r.usuari ? ' · ' + r.usuari : ''),
