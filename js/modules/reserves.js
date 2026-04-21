@@ -271,42 +271,50 @@ window.ModulReserves = (function () {
     });
   }
 
-  function _submitReserva() {
-    const btnOk = document.getElementById('btn-checklist-ok');
-    btnOk.disabled = true;
-    btnOk.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardant…';
+function _submitReserva() {
+  const btnOk = document.getElementById('btn-checklist-ok');
+  btnOk.disabled = true;
+  btnOk.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardant…';
 
-    const notes = (document.getElementById('checklist-notes') || {}).value || '';
-    const items = Array.from(document.querySelectorAll('.checklist-cb:checked'))
-                       .map(function (cb) { return cb.id; }).join(',');
+  const notes = (document.getElementById('checklist-notes') || {}).value || '';
+  const items = Array.from(document.querySelectorAll('.checklist-cb:checked'))
+                     .map(function (cb) { return cb.id; }).join(',');
 
-    API.protocols.registreChecklist({
-      maquina_id:     _pendingRes.maquina_id,
-      inici:          _pendingRes.inici,
-      fi:             _pendingRes.fi,
-      notes:          notes,
-      reserva_id:     '',
-      id_protocol:    _pendingRes.maquina_id,
-      bloc_completat: 'INICI,DURANT,TANCAMENT',
-      items_total:    document.querySelectorAll('.checklist-cb').length,
-      items_validats: items,
-    }).then(function (res) {
+  const inici  = new Date(_pendingRes.inici);
+  const fi     = new Date(_pendingRes.fi);
+  const data   = inici.toISOString().slice(0, 10);
+  const horaInici = ('0' + inici.getHours()).slice(-2) + ':' + ('0' + inici.getMinutes()).slice(-2);
+  const horaFi    = ('0' + fi.getHours()).slice(-2)    + ':' + ('0' + fi.getMinutes()).slice(-2);
+
+  API.reserves.create(_pendingRes.maquina_id, data, horaInici, horaFi, '', notes)
+    .then(function (res) {
+      const reservaId = res.id || '';
+      return API.protocols.registreChecklist({
+        maquina_id:     _pendingRes.maquina_id,
+        inici:          _pendingRes.inici,
+        fi:             _pendingRes.fi,
+        notes:          notes,
+        reserva_id:     reservaId,
+        id_protocol:    _pendingRes.maquina_id,
+        bloc_completat: 'INICI,DURANT,TANCAMENT',
+        items_total:    document.querySelectorAll('.checklist-cb').length,
+        items_validats: items,
+      });
+    })
+    .then(function () {
       _hideModal('checklist-modal');
       _pendingRes = null;
       btnOk.disabled    = false;
       btnOk.textContent = 'Confirmar reserva';
-    if (res.registrat || res.ok) {
-        _toast('Reserva creada correctament! ✓', 'success');
-        _calendar && _calendar.refetchEvents();
-      } else {
-        _toast(res.error || 'Error en crear la reserva.', 'danger');
-      }
-    }).catch(function () {
-      _toast('Error de connexió.', 'danger');
+      _toast('Reserva creada correctament! ✓', 'success');
+      _calendar && _calendar.refetchEvents();
+    })
+    .catch(function (err) {
+      _toast((err && err.message) || 'Error en crear la reserva.', 'danger');
       btnOk.disabled    = false;
       btnOk.textContent = 'Confirmar reserva';
     });
-  }
+}
 
   // ══════════════════════════════════════════════════
   //  UTILITATS
