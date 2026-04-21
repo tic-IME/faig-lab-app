@@ -349,9 +349,23 @@ window.ModulCalendari = (function () {
   }
 
   function _ubicacioEsTaller(ubicacio, taller) {
-    if (!ubicacio) return false;
-    return String(ubicacio).toLowerCase().indexOf(taller.toLowerCase()) !== -1;
-  }
+  if (!ubicacio) return false;
+  const mapa = {
+    'LASER-FLUX-01': 'Taller 2',
+    'LASER-CRFA-01': 'Taller 1',
+    '3D-ENDER-01':   'Taller 1',
+    '3D-ENDER-02':   'Taller 1',
+    '3D-ENDER-03':   'Taller 1',
+    '3D-ENDER-04':   'Taller 1',
+    '3D-ENDER-05':   'Taller 2',
+    '3D-SOVOL-01':   'Taller 2',
+    '3D-SOVOL-02':   'Taller 2',
+    'PLOT-SILH-01':  'Taller 2',
+    'BROD-EMB-01':   'Taller 2',
+    '3DSCAN-LIZARD-02': 'Taller 2',
+  };
+  return mapa[String(ubicacio)] === taller;
+}
 
   function _setLoading(on) {
     const body = document.getElementById('cal-body');
