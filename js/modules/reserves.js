@@ -122,7 +122,7 @@ window.ModulReserves = (function () {
   function _fetchEvents(info, successCb, failureCb) {
     API.call('getReserves', { start: info.startStr, end: info.endStr })
       .then(function (res) {
-        if (!res.ok) { failureCb(res.error || 'Error'); return; }
+        if (!Array.isArray(res) && !res.ok) { failureCb(res.error || 'Error'); return; }
        successCb((Array.isArray(res) ? res : (res.reserves || [])).map(function (r) {
           return {
             id:              r.id,
