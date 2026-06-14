@@ -34,7 +34,7 @@ window.ModulCalendari = (function () {
       const [hor1, hor2, reservesRaw] = await Promise.all([
         API.horari.getSetmana(TALLERS[0]),
         API.horari.getSetmana(TALLERS[1]),
-        API.reserves.get({ data: _dateStr(dilluns) }),
+        API.reserves.get({}),
       ]);
 
       _horaris  = { [TALLERS[0]]: hor1 || [], [TALLERS[1]]: hor2 || [] };
@@ -139,17 +139,16 @@ window.ModulCalendari = (function () {
     });
 
     const teReserva = _reserves.some(function (r) {
-      console.log('DATA:', r['Data_Reserva'], 'TOKEN:', r['Token_Permis'], 'HORA_I:', r['Hora_Inici'], 'HORA_F:', r['Hora_Final'], 'hora:', hora, 'horaFi:', horaFi);
-      return r['Data_Reserva'] === diaStr &&
-             _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller) &&
-             ['confirmada', 'aprovada', 'pendent_permis'].indexOf(r['Estat_Reserva']) !== -1 &&
+      return _normDataCal(r['Data_Reserva']) === diaStr &&
+             _ubicacioEsTaller(r['ID_Maquina'], taller) &&
+             ['confirmada', 'aprovada', 'pendent_permis', 'pendent_permís'].indexOf(r['Estat_Reserva']) !== -1 &&
              _timesOverlap(r['Hora_Inici'], r['Hora_Final'], hora, horaFi)
 });
     const reservaObj = teReserva
       ? _reserves.find(function (r) {
-          return r['Data_Reserva'] === diaStr &&
-                 _ubicacioEsTaller(r['Token_Permis'] || r['ID_Maquina'], taller) &&
-                 ['confirmada', 'aprovada', 'pendent_permis'].indexOf(r['Estat_Reserva']) !== -1 &&
+          return _normDataCal(r['Data_Reserva']) === diaStr &&
+                 _ubicacioEsTaller(r['ID_Maquina'], taller) &&
+                 ['confirmada', 'aprovada', 'pendent_permis', 'pendent_permís'].indexOf(r['Estat_Reserva']) !== -1 &&
                  _timesOverlap(r['Hora_Inici'], r['Hora_Final'], hora, horaFi);
         })
       : null;
@@ -166,7 +165,7 @@ window.ModulCalendari = (function () {
       return '<td style="background:#fef9c3;font-size:.72rem;padding:.3rem .5rem;vertical-align:top;">' +
              '<span title="Solapament classe + reserva">⚠️ Solapament</span>' +
              '<br><small style="opacity:.8;">' + (classeObj['Assignatura_Grup'] || '') + '</small>' +
-             '<br><small style="opacity:.8;">' + (reservaObj['Grup_Projecte'] || reservaObj['Nom_Usuari'] || '') + '</small>' +
+             '<br><small style="opacity:.8;">' + (reservaObj['Grup/Projecte'] || reservaObj['Docent_Responsable'] || '') + '</small>' +
              '</td>';
     }
 
@@ -182,8 +181,8 @@ window.ModulCalendari = (function () {
     if (teReserva) {
       const estatCls = 'reserva-' + (reservaObj['Estat_Reserva'] || 'confirmada').replace(/[^a-z]/g, '');
       return '<td style="background:#dcfce7;font-size:.72rem;padding:.3rem .5rem;vertical-align:top;">' +
-             '<strong style="color:#166534;">' + (reservaObj['Grup_Projecte'] || '—') + '</strong>' +
-             '<br><small style="color:#166534;opacity:.8;">' + (reservaObj['Nom_Usuari'] || '') + '</small>' +
+             '<strong style="color:#166534;">' + (reservaObj['Grup/Projecte'] || '—') + '</strong>' +
+             '<br><small style="color:#166534;opacity:.8;">' + (reservaObj['Docent_Responsable'] || reservaObj['Usuari'] || '') + '</small>' +
              '<br><span class="reserva-badge ' + estatCls + '" style="margin-top:2px;">' + (reservaObj['Estat_Reserva'] || '') + '</span>' +
              '</td>';
     }
@@ -319,6 +318,14 @@ window.ModulCalendari = (function () {
     const mm   = String(d.getMonth() + 1).padStart(2, '0');
     const dd   = String(d.getDate()).padStart(2, '0');
     return yyyy + '-' + mm + '-' + dd;
+  }
+
+  // Normalitza Data_Reserva (text, ISO o Date) a 'YYYY-MM-DD' per comparar
+  function _normDataCal(v) {
+    if (!v) return '';
+    if (v instanceof Date) return _dateStr(v);
+    const s = String(v);
+    return s.indexOf('T') !== -1 ? s.slice(0, 10) : s;
   }
 
   function _dateLabel(d) {

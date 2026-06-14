@@ -120,22 +120,66 @@ window.ModulReserves = (function () {
   }
 
   function _fetchEvents(info, successCb, failureCb) {
-    API.call('getReserves', { start: info.startStr, end: info.endStr })
+    API.reserves.get({})
       .then(function (res) {
-        if (!Array.isArray(res) && !res.ok) { failureCb(res.error || 'Error'); return; }
-       successCb((Array.isArray(res) ? res : (res.reserves || [])).map(function (r) {
-          return {
-            id:              r.id,
-            title:           (r.maquina || '') + (r.usuari ? ' · ' + r.usuari : ''),
-            start:           r.inici,
-            end:             r.fi,
-            backgroundColor: COLORS[_slug(r.maquina)] || COLORS.default,
-            borderColor:     'transparent',
-            extendedProps:   r,
-          };
-        }));
+        const rows = Array.isArray(res) ? res : (res && res.reserves) || [];
+        const EXCLOSOS = ['denegada', 'cancel·lada', 'cancelada', 'suspesa'];
+        const events = rows
+          .filter(function (r) {
+            return EXCLOSOS.indexOf(r['Estat_Reserva'] || '') === -1;
+          })
+          .map(function (r) {
+            const dia = _normData(r['Data_Reserva']);
+            const ini = _normHora(r['Hora_Inici']);
+            const fi  = _normHora(r['Hora_Final']);
+            const maq = r['ID_Maquina'] || '';
+            const qui = r['Docent_Responsable'] || r['Usuari'] || '';
+            const start = dia && ini ? dia + 'T' + ini : null;
+            const end   = dia && fi  ? dia + 'T' + fi  : null;
+            return {
+              id:              r['ID_Reserva'],
+              title:           maq + (qui ? ' · ' + qui : ''),
+              start:           start,
+              end:             end,
+              backgroundColor: COLORS[_slug(maq)] || COLORS.default,
+              borderColor:     'transparent',
+              extendedProps:   {
+                maquina: maq,
+                usuari:  qui,
+                email:   r['Usuari'] || '',
+                inici:   start,
+                fi:      end,
+                notes:   r['Grup/Projecte'] || '',
+                estat:   r['Estat_Reserva'] || '',
+              },
+            };
+          })
+          .filter(function (e) { return e.start && e.end; });
+        successCb(events);
       })
       .catch(failureCb);
+  }
+
+  // Normalitza la data (text 'YYYY-MM-DD', ISO o Date) a 'YYYY-MM-DD'
+  function _normData(v) {
+    if (!v) return '';
+    if (v instanceof Date) {
+      return v.getFullYear() + '-' +
+             ('0' + (v.getMonth() + 1)).slice(-2) + '-' +
+             ('0' + v.getDate()).slice(-2);
+    }
+    const s = String(v);
+    return s.indexOf('T') !== -1 ? s.slice(0, 10) : s;
+  }
+
+  // Normalitza l'hora (text 'HH:MM[:SS]' o Date) a 'HH:MM'
+  function _normHora(v) {
+    if (!v) return '';
+    if (v instanceof Date) {
+      return ('0' + v.getHours()).slice(-2) + ':' + ('0' + v.getMinutes()).slice(-2);
+    }
+    const m = String(v).match(/(\d{1,2}):(\d{2})/);
+    return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : '';
   }
 
   // ── Selecció franja nova ───────────────────────────
@@ -195,10 +239,13 @@ window.ModulReserves = (function () {
     if (pot) {
       document.getElementById('btn-cancel-res').addEventListener('click', function () {
         if (!confirm('Segur que vols cancel·lar aquesta reserva?')) return;
-        API.call('cancelReserva', { id: info.event.id }).then(function (res) {
+        API.reserves.cancel(info.event.id).then(function (res) {
           _hideModal('res-modal');
-          if (res.ok) { _toast('Reserva cancel·lada.', 'success'); _calendar.refetchEvents(); }
-          else { _toast(res.error || 'Error.', 'danger'); }
+          if (res && res.cancelled) { _toast('Reserva cancel·lada.', 'success'); _calendar.refetchEvents(); }
+          else { _toast((res && res.error) || 'Error.', 'danger'); }
+        }).catch(function (err) {
+          _hideModal('res-modal');
+          _toast((err && err.message) || 'Error en cancel·lar.', 'danger');
         });
       });
     }
