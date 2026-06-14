@@ -191,21 +191,10 @@ window.ModulReserves = (function () {
       <p><strong>Franja:</strong> ${_fmt(info.start)} – ${_fmtHora(info.end)}</p>
       <label class="form-label mt-2">Màquina:</label>
       <select id="sel-maquina" class="form-select">
-        <option value="">— Escull una màquina —</option>
-        <option value="LASER-FLUX-01">Talladora Làser FLUX</option>
-        <option value="LASER-CRFA-01">Talladora Làser Falcon</option>
-        <option value="3D-ENDER-01">Impressora 3D Ender-01 (T1)</option>
-        <option value="3D-ENDER-02">Impressora 3D Ender-02 (T1)</option>
-        <option value="3D-ENDER-03">Impressora 3D Ender-03 (T1)</option>
-        <option value="3D-ENDER-04">Impressora 3D Ender-04 (T2)</option>
-        <option value="3D-ENDER-05">Impressora 3D Ender-05 (T2)</option>
-        <option value="3D-SOVOL-01">Impressora 3D Sovol-01 (T2)</option>
-        <option value="3D-SOVOL-02">Impressora 3D Sovol-02 (T2)</option>
-        <option value="PLOT-SILH-01">Plòter de Tall</option>
-        <option value="BROD-EMB-01">Brodadora</option>
-        <option value="3DSCAN-LIZARD-02">Escàner 3D</option>
+        <option value="">Carregant màquines…</option>
       </select>
     `;
+    document.getElementById('res-modal-ok').textContent = 'Continuar';
     document.getElementById('res-modal-ok').onclick = function () {
       const maq = document.getElementById('sel-maquina').value;
       if (!maq) { alert('Has de seleccionar una màquina.'); return; }
@@ -214,6 +203,31 @@ window.ModulReserves = (function () {
       _openChecklist(maq);
     };
     _showModal('res-modal');
+
+    // El desplegable es genera des de Control_Màquines (font de veritat):
+    // així el taller de cada màquina sempre coincideix amb el full, i les
+    // màquines no operatives surten desactivades.
+    API.maquines.getAll()
+      .then(function (maquines) {
+        const sel = document.getElementById('sel-maquina');
+        if (!sel) return;
+        const llista = (Array.isArray(maquines) ? maquines : [])
+          .filter(function (m) { return m && m['ID_Maquina']; });
+        let opts = '<option value="">— Escull una màquina —</option>';
+        llista.forEach(function (m) {
+          const id  = m['ID_Maquina'];
+          const ubi = m['Ubicació'] || '';
+          const est = String(m['Estat_Actual'] || '');
+          const operativa = est.toLowerCase().indexOf('operativa') !== -1;
+          const etiqueta = id + (ubi ? ' · ' + ubi : '') + (operativa ? '' : ' — ' + est);
+          opts += '<option value="' + id + '"' + (operativa ? '' : ' disabled') + '>' + etiqueta + '</option>';
+        });
+        sel.innerHTML = opts;
+      })
+      .catch(function () {
+        const sel = document.getElementById('sel-maquina');
+        if (sel) sel.innerHTML = '<option value="">No s\'han pogut carregar les màquines</option>';
+      });
   }
 
   // ── Clic reserva existent ──────────────────────────
