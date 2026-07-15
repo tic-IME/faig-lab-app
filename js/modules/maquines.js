@@ -112,7 +112,7 @@ window.ModulMaquines = (function () {
     // Listeners botó incidència: obre el formulari del centre en pestanya nova
     cos.querySelectorAll('.btn-reportar-inc').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        window.open(FAIG_CONFIG.FORM_INCIDENCIES_URL || '', '_blank', 'noopener');
+        window.open(_urlIncidencia(btn.dataset.id), '_blank', 'noopener');
       });
     });
   }
@@ -208,6 +208,18 @@ window.ModulMaquines = (function () {
       Toast.error('Error actualitzant estat: ' + err.message);
       await _carrega();
     }
+  }
+
+  // ── URL del formulari d'incidències ───────────────────────
+
+  // Preselecciona la màquina al formulari. Els ID_Maquina de Control_Màquines
+  // coincideixen amb les opcions del formulari, que governen l'encaminament per seccions.
+  function _urlIncidencia(idMaquina) {
+    const base = FAIG_CONFIG.FORM_INCIDENCIES_URL || '';
+    const entry = FAIG_CONFIG.FORM_INCIDENCIES_ENTRY_MAQUINA;
+    if (!base || !idMaquina || !entry) return base;
+    const sep = base.indexOf('?') === -1 ? '?' : '&';
+    return base + sep + 'usp=pp_url&' + entry + '=' + encodeURIComponent(idMaquina);
   }
 
   // ── Utilitats ─────────────────────────────────────────────
