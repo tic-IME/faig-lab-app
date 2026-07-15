@@ -109,10 +109,10 @@ window.ModulMaquines = (function () {
       });
     }
 
-    // Listeners botó incidència
+    // Listeners botó incidència: obre el formulari del centre en pestanya nova
     cos.querySelectorAll('.btn-reportar-inc').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        _obreModalIncidencia(btn.dataset.id, btn.dataset.ubicacio);
+        window.open(FAIG_CONFIG.FORM_INCIDENCIES_URL || '', '_blank', 'noopener');
       });
     });
   }
@@ -208,118 +208,6 @@ window.ModulMaquines = (function () {
       Toast.error('Error actualitzant estat: ' + err.message);
       await _carrega();
     }
-  }
-
-  // ── Modal incidència ──────────────────────────────────────
-
-  function _obreModalIncidencia(maquinaId, ubicacio) {
-    const URGENCIES = [
-      '🟢 Pot esperar',
-      '🟡 Atenció requerida',
-      '🟠 Problema seriós',
-      '🔴 Màquina aturada',
-      '🚨 Emergència / Risc',
-    ];
-
-    const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.innerHTML =
-      '<div class="modal-card">' +
-        '<div class="modal-header">' +
-          '<span class="modal-title">⚠️ Reportar incidència</span>' +
-          '<button class="modal-close" id="inc-close-btn">✕</button>' +
-        '</div>' +
-        '<div class="modal-body">' +
-          '<div class="form-group">' +
-            '<label>Màquina afectada</label>' +
-            '<input type="text" value="' + _esc(maquinaId) + '" readonly style="opacity:.7;">' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Ubicació</label>' +
-            '<input type="text" id="inc-ubicacio" value="' + _esc(ubicacio) + '">' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Urgència *</label>' +
-            '<select id="inc-urgencia">' +
-              '<option value="">— Selecciona urgència —</option>' +
-              URGENCIES.map(function (u) {
-                return '<option value="' + _esc(u) + '">' + _esc(u) + '</option>';
-              }).join('') +
-            '</select>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Descripció *</label>' +
-            '<textarea id="inc-desc" placeholder="Descriu el problema amb el màxim detall possible..." style="min-height:110px;"></textarea>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Correu de contacte del centre</label>' +
-            '<input type="email" id="inc-correu" placeholder="incidencies@escolamesample.cat">' +
-          '</div>' +
-          '<div id="inc-avis" style="display:none;padding:.6rem .875rem;border-radius:7px;' +
-               'background:#fef9c3;border:1px solid #fde68a;font-size:.82rem;color:#854d0e;">' +
-            '⚠️ <strong>Urgència alta:</strong> La màquina passarà a estat de revisió/standby ' +
-            'i les reserves futures seran suspeses automàticament.' +
-          '</div>' +
-          '<p id="inc-error" class="form-error" style="display:none;"></p>' +
-        '</div>' +
-        '<div class="modal-actions">' +
-          '<button class="btn-secondary" id="inc-cancel-btn">Cancel·la</button>' +
-          '<button class="btn-danger" id="inc-submit-btn">Enviar incidència</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(backdrop);
-
-    // Avís urgències altes
-    const selUrg = backdrop.querySelector('#inc-urgencia');
-    const avis   = backdrop.querySelector('#inc-avis');
-    selUrg.addEventListener('change', function () {
-      const altes = ['🟠 Problema seriós', '🔴 Màquina aturada', '🚨 Emergència / Risc'];
-      avis.style.display = altes.indexOf(selUrg.value) !== -1 ? '' : 'none';
-    });
-
-    function _tanca() { backdrop.remove(); }
-    backdrop.querySelector('#inc-close-btn').addEventListener('click', _tanca);
-    backdrop.querySelector('#inc-cancel-btn').addEventListener('click', _tanca);
-    backdrop.addEventListener('click', function (e) { if (e.target === backdrop) _tanca(); });
-
-    backdrop.querySelector('#inc-submit-btn').addEventListener('click', async function () {
-      const btn     = backdrop.querySelector('#inc-submit-btn');
-      const errEl   = backdrop.querySelector('#inc-error');
-      const urgencia= backdrop.querySelector('#inc-urgencia').value;
-      const desc    = backdrop.querySelector('#inc-desc').value.trim();
-      const ubicEl  = backdrop.querySelector('#inc-ubicacio').value.trim();
-      const correu  = backdrop.querySelector('#inc-correu').value.trim();
-
-      errEl.style.display = 'none';
-
-      if (!urgencia || !desc) {
-        errEl.textContent   = 'La urgència i la descripció són obligatòries.';
-        errEl.style.display = '';
-        return;
-      }
-
-      btn.disabled    = true;
-      btn.textContent = 'Enviant…';
-
-      try {
-        await API.incidencies.create(maquinaId, ubicEl, urgencia, desc, correu);
-
-        const altes = ['🟠 Problema seriós', '🔴 Màquina aturada', '🚨 Emergència / Risc'];
-        if (altes.indexOf(urgencia) !== -1) {
-          Toast.warning('Incidència enviada. Les reserves futures han estat suspeses i els administradors han rebut un avís.');
-        } else {
-          Toast.ok('Incidència reportada correctament.');
-        }
-        _tanca();
-        await _carrega();
-      } catch (err) {
-        errEl.textContent   = err.message || 'Error enviant la incidència.';
-        errEl.style.display = '';
-        btn.disabled        = false;
-        btn.textContent     = 'Enviar incidència';
-      }
-    });
   }
 
   // ── Utilitats ─────────────────────────────────────────────

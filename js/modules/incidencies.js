@@ -4,16 +4,6 @@
 
 window.ModulIncidencies = (function () {
 
-  const URGENCIA_CSS = {
-    '🟢 Pot esperar':        { cls: 'reserva-confirmada',  label: 'Baixa'    },
-    '🟡 Atenció requerida':  { cls: 'reserva-pendent',     label: 'Mitjana'  },
-    '🟠 Problema seriós':    { cls: 'reserva-suspesa',     label: 'Alta'     },
-    '🔴 Màquina aturada':    { cls: 'reserva-denegada',    label: 'Crítica'  },
-    '🚨 Emergència / Risc':  { cls: 'reserva-denegada',    label: 'Emergència'},
-  };
-
-  const URGENCIES_ALTES = ['🟠 Problema seriós', '🔴 Màquina aturada', '🚨 Emergència / Risc'];
-
   let _container = null;
   let _maquines  = [];
 
@@ -36,14 +26,17 @@ window.ModulIncidencies = (function () {
       '</div>' +
       '<div id="inc-body"><div class="spinner-wrap"><div class="spinner"></div></div></div>';
 
-    try {
-      _maquines = (await API.maquines.getAll()) || [];
-      _renderContingut();
-    } catch (err) {
-      Toast.error('Error carregant les màquines: ' + err.message);
-      document.getElementById('inc-body').innerHTML =
-        '<div class="empty-state"><p class="empty-state-desc">No s\'han pogut carregar les dades.</p></div>';
+    // Les màquines només calen per a la vista d'admin de sota la targeta.
+    if (Auth.isAdmin()) {
+      try {
+        _maquines = (await API.maquines.getAll()) || [];
+      } catch (err) {
+        _maquines = [];
+        Toast.error('Error carregant les màquines: ' + err.message);
+      }
     }
+
+    _renderContingut();
   }
 
   // ── Render contingut ──────────────────────────────────────
@@ -52,69 +45,24 @@ window.ModulIncidencies = (function () {
     const cos = document.getElementById('inc-body');
     if (!cos) return;
 
-    // Màquines disponibles (exclou standby total)
-    const maquinesDisp = _maquines.filter(function (m) {
-      return m['Estat_Actual'] !== 'Standby - No disponible';
-    });
-
-    const opcMaquines = maquinesDisp.map(function (m) {
-      const estat = m['Estat_Actual'] ? ' [' + m['Estat_Actual'] + ']' : '';
-      return '<option value="' + _esc(m['ID_Maquina']) + '" data-ubicacio="' + _esc(m['Ubicació'] || '') + '">' +
-             _esc((m['ID_Maquina'] || '') + ' — ' + (m['Tipus_Maquina'] || '') + estat) +
-             '</option>';
-    }).join('');
-
-    const opcUrgencies = (FAIG_CONFIG.URGENCIES || []).map(function (u) {
-      return '<option value="' + _esc(u) + '">' + _esc(u) + '</option>';
-    }).join('');
+    const urlForm = FAIG_CONFIG.FORM_INCIDENCIES_URL || '';
 
     cos.innerHTML =
-      // ── Formulari ──
+      // ── Targeta: enllaç al formulari del centre ──
       '<div class="card" style="max-width:640px;margin-bottom:1.5rem;">' +
         '<div class="card-header"><span class="card-title">⚠️ Nova incidència</span></div>' +
 
-        '<div class="form-row">' +
-          '<div class="form-group">' +
-            '<label>Màquina afectada *</label>' +
-            '<select id="inc-maquina">' +
-              '<option value="">— Selecciona màquina —</option>' + opcMaquines +
-            '</select>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Ubicació</label>' +
-            '<input type="text" id="inc-ubicacio" placeholder="S\'omple automàticament" readonly ' +
-                   'style="background:var(--col-bg);opacity:.85;">' +
-          '</div>' +
-        '</div>' +
+        '<p style="font-size:.9rem;line-height:1.55;margin-bottom:1.125rem;">' +
+          'Has tingut un problema amb una màquina o al taller? Registra la incidència al formulari ' +
+          'del centre. El sistema avisa automàticament els responsables i, si cal, actualitza ' +
+          'l\'estat de la màquina.' +
+        '</p>' +
 
-        '<div class="form-group">' +
-          '<label>Urgència *</label>' +
-          '<select id="inc-urgencia">' +
-            '<option value="">— Selecciona urgència —</option>' + opcUrgencies +
-          '</select>' +
-        '</div>' +
-
-        '<div id="inc-avis-alta" style="display:none;padding:.65rem .875rem;border-radius:7px;margin-bottom:.75rem;' +
-             'background:#fef9c3;border:1px solid #fde68a;font-size:.83rem;color:#854d0e;">' +
-          '<strong>⚠️ Urgència alta:</strong> En enviar, la màquina passarà a estat de revisió o standby ' +
-          'i totes les reserves futures seran suspeses automàticament. Els administradors rebran un avís per email.' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label>Descripció del problema *</label>' +
-          '<textarea id="inc-desc" placeholder="Descriu el problema amb el màxim detall: quan ha passat, com s\'ha manifestat, si hi ha hagut soroll, fum, error en pantalla..." style="min-height:120px;"></textarea>' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label>Correu de contacte del centre (opcional)</label>' +
-          '<input type="email" id="inc-correu" placeholder="incidencies@escolamesample.cat">' +
-        '</div>' +
-
-        '<p id="inc-form-error" class="form-error" style="display:none;"></p>' +
-
-        '<div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.5rem;">' +
-          '<button class="btn-secondary" id="btn-inc-netejar">Neteja</button>' +
-          '<button class="btn-danger" id="btn-inc-enviar">Enviar incidència</button>' +
+        '<div style="display:flex;justify-content:flex-end;">' +
+          '<a class="btn-danger" id="btn-inc-formulari" href="' + _esc(urlForm) + '" ' +
+             'target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">' +
+            'Obre el formulari d\'incidències' +
+          '</a>' +
         '</div>' +
       '</div>' +
 
@@ -127,101 +75,10 @@ window.ModulIncidencies = (function () {
           '</div>'
         : '');
 
-    // Autoomplert ubicació
-    document.getElementById('inc-maquina').addEventListener('change', function () {
-      const sel = this.options[this.selectedIndex];
-      const ubi = sel ? (sel.dataset.ubicacio || '') : '';
-      document.getElementById('inc-ubicacio').value = ubi;
-    });
-
-    // Avís urgència alta
-    document.getElementById('inc-urgencia').addEventListener('change', function () {
-      const avis = document.getElementById('inc-avis-alta');
-      avis.style.display = URGENCIES_ALTES.indexOf(this.value) !== -1 ? '' : 'none';
-    });
-
-    // Neteja formulari
-    document.getElementById('btn-inc-netejar').addEventListener('click', _neteja);
-
-    // Enviar
-    document.getElementById('btn-inc-enviar').addEventListener('click', _enviar);
-
     // Carrega llista si ADMIN
     if (Auth.isAdmin()) {
       _carregaLlista();
     }
-  }
-
-  // ── Enviar incidència ─────────────────────────────────────
-
-  async function _enviar() {
-    const btn    = document.getElementById('btn-inc-enviar');
-    const errEl  = document.getElementById('inc-form-error');
-    const maqId  = document.getElementById('inc-maquina').value;
-    const ubi    = document.getElementById('inc-ubicacio').value.trim();
-    const urg    = document.getElementById('inc-urgencia').value;
-    const desc   = document.getElementById('inc-desc').value.trim();
-    const correu = document.getElementById('inc-correu').value.trim();
-
-    errEl.style.display = 'none';
-
-    if (!maqId) {
-      errEl.textContent   = 'Selecciona la màquina afectada.';
-      errEl.style.display = '';
-      return;
-    }
-    if (!urg) {
-      errEl.textContent   = 'Selecciona el nivell d\'urgència.';
-      errEl.style.display = '';
-      return;
-    }
-    if (!desc) {
-      errEl.textContent   = 'La descripció del problema és obligatòria.';
-      errEl.style.display = '';
-      return;
-    }
-
-    btn.disabled    = true;
-    btn.textContent = 'Enviant…';
-
-    try {
-      await API.incidencies.create(maqId, ubi, urg, desc, correu);
-
-      if (URGENCIES_ALTES.indexOf(urg) !== -1) {
-        Toast.warning('Incidència enviada. La màquina ha canviat d\'estat i les reserves futures han estat suspeses.');
-      } else {
-        Toast.ok('Incidència reportada correctament. Gràcies!');
-      }
-
-      _neteja();
-
-      if (Auth.isAdmin()) {
-        _carregaLlista();
-      }
-    } catch (err) {
-      errEl.textContent   = err.message || 'Error enviant la incidència. Torna-ho a intentar.';
-      errEl.style.display = '';
-    } finally {
-      btn.disabled    = false;
-      btn.textContent = 'Enviar incidència';
-    }
-  }
-
-  // ── Neteja formulari ──────────────────────────────────────
-
-  function _neteja() {
-    const ids = ['inc-maquina', 'inc-ubicacio', 'inc-urgencia', 'inc-desc', 'inc-correu', 'inc-form-error'];
-    ids.forEach(function (id) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (el.tagName === 'SELECT') el.selectedIndex = 0;
-      else if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') el.value = '';
-      else el.style.display = 'none';
-    });
-    const avis = document.getElementById('inc-avis-alta');
-    if (avis) avis.style.display = 'none';
-    const errEl = document.getElementById('inc-form-error');
-    if (errEl) errEl.style.display = 'none';
   }
 
   // ── Llista incidències (ADMIN) ────────────────────────────

@@ -31,6 +31,8 @@ const FAIG_CONFIG = {
     '🔴 Màquina aturada',
     '🚨 Emergència / Risc',
   ],
+  // Formulari públic d'incidències del centre (via única d'entrada; motor de regles al backend)
+  FORM_INCIDENCIES_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSepRkglU9XDUAO5pefruvbvxSkV4RyJxP_GrZ69_qQjQmAAlg/viewform',
 };
 
 Object.freeze(FAIG_CONFIG);
