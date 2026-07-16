@@ -8,6 +8,10 @@ window.ModulIncidencies = (function () {
   // del backend i amb la validació de dades de la columna Estat del full.
   const ESTATS_INC = ['Oberta', 'En curs', 'Resolta'];
 
+  // Valor exacte de la llista ESTATS de js/modules/maquines.js i de la columna
+  // Estat_Actual de Control_Màquines. Si canvia allà, ha de canviar aquí.
+  const MAQUINA_OPERATIVA = 'Operativa';
+
   // Opcions del filtre. El valor buit és el que el backend entén com "no resoltes".
   const FILTRES = [
     { valor: '',        etiqueta: 'Obertes i en curs' },
@@ -24,7 +28,7 @@ window.ModulIncidencies = (function () {
   const CEL_DETALL = 'background:var(--col-bg);border-top:1px solid var(--col-border);';
 
   let _container   = null;
-  let _maquines    = [];   // carregades per a l'admin; les farà servir el Tram D3
+  let _maquines    = [];   // per al suggeriment d'estat en resoldre (D3)
   let _incidencies = [];
   let _filtre      = '';
   let _detalls     = {};   // cache id → camps, per no refer la crida en replegar i desplegar
@@ -288,18 +292,66 @@ window.ModulIncidencies = (function () {
       return;
     }
 
+    // Capturem la incidència ABANS de recarregar: _carregaLlista reemplaça _incidencies.
+    const inc = _incidencies.find(function (i) { return i.id === incidenciaId; });
+
     sel.disabled = true;
     try {
       await API.incidencies.updateEstat(incidenciaId, nouEstat);
       Toast.ok('Incidència ' + incidenciaId + ' actualitzada a "' + nouEstat + '".');
       // El detall conté les columnes d'estat de la fila: la cache queda obsoleta.
       delete _detalls[incidenciaId];
-      // Recarreguem: amb el filtre per defecte, una "Resolta" desapareix de la llista.
-      await _carregaLlista();
     } catch (err) {
       Toast.error('Error actualitzant la incidència: ' + err.message);
       sel.value = anterior;
       sel.disabled = false;
+      return;
+    }
+
+    // El suggeriment va DESPRÉS del canvi ja desat i mai el pot desfer: si aquí
+    // falla res, la incidència es queda resolta igualment.
+    if (nouEstat === 'Resolta') {
+      await _suggereixOperativa(inc);
+    }
+
+    // Recarreguem: amb el filtre per defecte, una "Resolta" desapareix de la llista.
+    await _carregaLlista();
+  }
+
+  // ── Suggeriment de màquina operativa (D3) ─────────────────
+
+  // En resoldre una incidència, la màquina pot haver quedat en un estat no operatiu
+  // (l'escalada automàtica del backend l'hi posa). Ho OFERIM; no s'executa mai sol:
+  // resoldre una incidència no canvia l'estat de la màquina (decisió del Tram C).
+  async function _suggereixOperativa(inc) {
+    if (!inc || !inc.maquina_id) return;
+
+    // Estat fresc: _maquines es va carregar en entrar al mòdul i pot ser de fa
+    // estona. El suggeriment afirma una cosa sobre la màquina a qui l'ha de decidir,
+    // i resoldre és una acció rara: una crida extra aquí surt a compte.
+    try {
+      _maquines = (await API.maquines.getAll()) || _maquines;
+    } catch (err) {
+      // Amb el que tinguem en memòria n'hi ha prou per a un suggeriment.
+    }
+
+    const maq = _maquines.find(function (m) { return m['ID_Maquina'] === inc.maquina_id; });
+    if (!maq) return;                                     // esborrada o reanomenada
+    if (maq['Estat_Actual'] === MAQUINA_OPERATIVA) return;
+
+    const estatActual = maq['Estat_Actual'] || '(sense estat)';
+    const accepta = confirm(
+      'Incidència ' + inc.id + ' resolta.\n\n' +
+      'La màquina ' + inc.maquina_id + ' encara consta com a "' + estatActual + '".\n\n' +
+      'Vols marcar-la com a Operativa?'
+    );
+    if (!accepta) return;
+
+    try {
+      await API.maquines.updateEstat(inc.maquina_id, MAQUINA_OPERATIVA, '');
+      Toast.ok('Màquina ' + inc.maquina_id + ' marcada com a Operativa.');
+    } catch (err) {
+      Toast.error('No s\'ha pogut actualitzar la màquina: ' + err.message);
     }
   }
 
