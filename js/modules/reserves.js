@@ -109,6 +109,18 @@ window.ModulReserves = (function () {
       nowIndicator: true,
       selectable:   true,
       selectMirror: true,
+      // Es pot arrossegar una selecció PER SOBRE d'una reserva existent: dos
+      // docents han de poder reservar màquines DIFERENTS a la mateixa hora, que
+      // és el cas d'ús central del taller. La guarda de debò és el backend.
+      //
+      // Callback i no 'true' a posta: avui aquest calendari només pinta reserves,
+      // però al tram de bloqueig hi entraran les classes d'Horari_Tallers com a
+      // esdeveniments de fons. Amb 'true' es podria seleccionar per sobre d'una
+      // classe el dia que hi siguin; així només s'hi pot per sobre del que està
+      // marcat com a reserva, i qualsevol tipus nou queda BLOQUEJAT per defecte.
+      selectOverlap: function (event) {
+        return !!(event.extendedProps && event.extendedProps.tipus === 'reserva');
+      },
       headerToolbar: {
         left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay',
       },
@@ -145,6 +157,10 @@ window.ModulReserves = (function () {
               backgroundColor: COLORS[_slug(maq)] || COLORS.default,
               borderColor:     'transparent',
               extendedProps:   {
+                // 'tipus' governa selectOverlap: només el que està marcat com a
+                // reserva es pot solapar amb una selecció nova. Les classes
+                // d'Horari_Tallers del tram de bloqueig portaran un tipus propi.
+                tipus:   'reserva',
                 maquina: maq,
                 usuari:  qui,
                 email:   r['Usuari'] || '',
@@ -188,15 +204,29 @@ window.ModulReserves = (function () {
   // en lloc del desplegable d'una sola màquina: sense infraestructura d'UI al
   // projecte, és el control més robust i no depèn de cap llibreria nova.
   function _onSlotSelect(info) {
-    _pendingRes = { inici: info.startStr, fi: info.endStr, maquines: [] };
+    _obreNovaReserva(info.startStr, info.endStr, info.start, info.end);
+  }
+
+  // Obre el modal de nova reserva per a una franja. Separat de _onSlotSelect
+  // perquè també s'hi arriba des del detall d'una reserva existent ("Reservar una
+  // altra màquina en aquesta franja"): quan la franja està totalment tapada per un
+  // esdeveniment no hi ha cap píxel lliure des d'on arrossegar, i aquell botó és
+  // l'ÚNIC camí. selectOverlap sol no ho resol.
+  function _obreNovaReserva(iniciStr, fiStr, iniciDate, fiDate) {
+    _pendingRes = { inici: iniciStr, fi: fiStr, maquines: [] };
     _maquines   = [];
+
+    const ocupades = _maquinesOcupades(iniciStr, fiStr);
+    const nOcup    = Object.keys(ocupades).length;
 
     document.getElementById('res-modal-title').textContent = 'Nova reserva';
     document.getElementById('res-modal-body').innerHTML = `
-      <p><strong>Franja:</strong> ${_fmt(info.start)} – ${_fmtHora(info.end)}</p>
+      <p><strong>Franja:</strong> ${_fmt(iniciDate)} – ${_fmtHora(fiDate)}</p>
       <label class="form-label mt-2">Màquines:</label>
       <p class="text-muted small mb-2">
-        Pots seleccionar-ne més d'una per a la mateixa franja.
+        Pots seleccionar-ne més d'una per a la mateixa franja.${nOcup
+          ? ' Les que ja estan reservades en aquesta franja surten desactivades.'
+          : ''}
       </p>
       <div id="maq-llista" class="border rounded p-2" style="max-height:16rem;overflow-y:auto;">
         <div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>
@@ -236,14 +266,23 @@ window.ModulReserves = (function () {
           const ubi = m['Ubicació'] || '';
           const est = String(m['Estat_Actual'] || '');
           const operativa = _esOperativa(est);
+          // Motiu pel qual no es pot triar: primer l'estat de la màquina, després
+          // que ja estigui reservada en aquesta franja. El modal INFORMA; qui
+          // decideix segueix sent el backend.
+          const reservada = Object.prototype.hasOwnProperty.call(ocupades, id);
+          const motiu = !operativa ? est
+                      : reservada  ? 'reservada' + (ocupades[id] ? ' per ' + ocupades[id] : '') + ' en aquesta franja'
+                      : '';
+          const bloquejada = !operativa || reservada;
           return `
-            <label class="d-flex gap-2 align-items-start py-1 ${operativa ? '' : 'opacity-50'}" for="maq-${i}">
+            <label class="d-flex gap-2 align-items-start py-1 ${bloquejada ? 'opacity-50' : ''}" for="maq-${i}">
               <input class="form-check-input flex-shrink-0 mt-1 maq-cb" type="checkbox"
                      id="maq-${i}" value="${id}" data-protocol="${m['ID_Protocol'] || ''}"
-                     ${operativa ? '' : 'disabled'}>
+                     data-bloquejada="${bloquejada ? '1' : ''}"
+                     ${bloquejada ? 'disabled' : ''}>
               <span class="small">
                 <strong>${id}</strong>${ubi ? ' <span class="text-muted">· ' + ubi + '</span>' : ''}
-                ${operativa ? '' : '<br><span class="text-muted">' + est + '</span>'}
+                ${motiu ? '<br><span class="text-muted">' + _esc(motiu) + '</span>' : ''}
               </span>
             </label>`;
         }).join('');
@@ -262,6 +301,28 @@ window.ModulReserves = (function () {
     return String(estat || '').toLowerCase().indexOf('operativa') !== -1;
   }
 
+  // Màquines ja reservades que creuen la franja → { ID_Maquina: qui }.
+  // Surt dels esdeveniments JA PINTATS al calendari, no d'una crida nova: és el
+  // mateix que l'usuari té davant i evita que el modal contradigui la vista. No
+  // és cap garantia — el backend torna a validar i pot rebutjar-ne alguna amb el
+  // motiu (algú altre pot haver reservat mentre el modal era obert).
+  function _maquinesOcupades(iniciStr, fiStr) {
+    const mapa = {};
+    if (!_calendar) return mapa;
+    const ini = new Date(iniciStr).getTime();
+    const fi  = new Date(fiStr).getTime();
+    if (isNaN(ini) || isNaN(fi)) return mapa;
+
+    _calendar.getEvents().forEach(function (ev) {
+      const p = ev.extendedProps || {};
+      if (p.tipus !== 'reserva' || !ev.start || !ev.end || !p.maquina) return;
+      if (ev.start.getTime() < fi && ev.end.getTime() > ini) {
+        mapa[p.maquina] = p.usuari || '';
+      }
+    });
+    return mapa;
+  }
+
   function _seleccionades() {
     return Array.from(document.querySelectorAll('.maq-cb:checked'))
                 .map(function (cb) { return cb.value; });
@@ -277,9 +338,11 @@ window.ModulReserves = (function () {
 
     document.querySelectorAll('.maq-cb').forEach(function (cb) {
       if (cb.checked) return;
-      const maq = _maquines.find(function (m) { return m['ID_Maquina'] === cb.value; });
-      const operativa = maq && _esOperativa(maq['Estat_Actual']);
-      cb.disabled = !operativa || (protocol !== null && cb.dataset.protocol !== protocol);
+      // data-bloquejada la fixa el render (no operativa, o ja reservada en aquesta
+      // franja) i no depèn de la selecció: no es pot recalcular aquí o
+      // reactivaríem una màquina que el render havia descartat.
+      const bloquejada = cb.dataset.bloquejada === '1';
+      cb.disabled = bloquejada || (protocol !== null && cb.dataset.protocol !== protocol);
       cb.closest('label').classList.toggle('opacity-50', cb.disabled);
     });
 
@@ -307,10 +370,28 @@ window.ModulReserves = (function () {
         <dt class="col-5">Fi</dt>     <dd class="col-7">${_fmtHora(new Date(r.fi))}</dd>
         <dt class="col-5">Notes</dt>  <dd class="col-7">${r.notes  || '—'}</dd>
       </dl>
+      <hr class="my-3">
+      <button class="btn btn-sm btn-outline-primary w-100" id="btn-nova-franja">
+        <i class="bi bi-plus-lg me-1"></i>Reservar una altra màquina en aquesta franja
+      </button>
       ${pot ? `<button class="btn btn-sm btn-danger mt-3" id="btn-cancel-res">Cancel·lar reserva</button>` : ''}
     `;
     document.getElementById('res-modal-ok').textContent = 'Tancar';
+    document.getElementById('res-modal-ok').disabled    = false;
     document.getElementById('res-modal-ok').onclick = function () { _hideModal('res-modal'); };
+
+    // Camí ÚNIC quan la franja està totalment tapada per reserves: no hi ha cap
+    // píxel lliure des d'on arrossegar una selecció nova, i selectOverlap només
+    // governa si una selecció pot solapar, no si es pot iniciar sobre un
+    // esdeveniment. Sense aquest botó, el defecte quedaria a mitges.
+    document.getElementById('btn-nova-franja').addEventListener('click', function () {
+      _hideModal('res-modal');
+      // Deixem tancar el modal abans de reobrir-lo amb contingut nou: Bootstrap
+      // s'embolica si es reutilitza la mateixa instància enmig de la transició.
+      setTimeout(function () {
+        _obreNovaReserva(r.inici, r.fi, new Date(r.inici), new Date(r.fi));
+      }, 200);
+    });
 
     if (pot) {
       document.getElementById('btn-cancel-res').addEventListener('click', function () {
@@ -516,6 +597,11 @@ window.ModulReserves = (function () {
   function _toast(msg, type) {
     if (typeof UI !== 'undefined' && UI.toast) { UI.toast(msg, type); return; }
     alert(msg);
+  }
+  function _esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   function _slug(str) {
     return (str || '').toLowerCase()
