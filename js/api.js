@@ -145,17 +145,6 @@ window.API = (function () {
         estat:         estat,
       });
     },
-    // NOMÉS aquest mètode és a la llista de neteja diferida (crida createIncidencia,
-    // que des del Tram B ja no fa servir ningú). getAll i updateEstat són codi viu.
-    create(maquinaId, ubicacio, urgencia, descripcio, correuCentre) {
-      return call('createIncidencia', {
-        maquina_id:    maquinaId,
-        ubicacio:      ubicacio      || '',
-        urgencia:      urgencia      || '',
-        descripcio:    descripcio    || '',
-        correu_centre: correuCentre  || '',
-      });
-    },
   };
 
   // ── Inventari ──────────────────────────────────────────────

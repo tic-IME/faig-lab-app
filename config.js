@@ -24,13 +24,6 @@ const FAIG_CONFIG = {
     SUSPESA: 'suspesa',
     CANCELADA: 'cancel·lada',
   },
-  URGENCIES: [
-    '🟢 Pot esperar',
-    '🟡 Atenció requerida',
-    '🟠 Problema seriós',
-    '🔴 Màquina aturada',
-    '🚨 Emergència / Risc',
-  ],
   // Formulari públic d'incidències del centre (via única d'entrada; motor de regles al backend)
   FORM_INCIDENCIES_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSepRkglU9XDUAO5pefruvbvxSkV4RyJxP_GrZ69_qQjQmAAlg/viewform',
   // Entry ID de la pregunta de màquina del formulari: permet preseleccionar-la amb usp=pp_url
