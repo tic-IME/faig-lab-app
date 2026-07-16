@@ -28,6 +28,12 @@ const FAIG_CONFIG = {
   FORM_INCIDENCIES_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSepRkglU9XDUAO5pefruvbvxSkV4RyJxP_GrZ69_qQjQmAAlg/viewform',
   // Entry ID de la pregunta de màquina del formulari: permet preseleccionar-la amb usp=pp_url
   FORM_INCIDENCIES_ENTRY_MAQUINA: 'entry.1463811996',
+  // Formulari públic d'encàrrecs als espais maker (via única d'entrada, igual que incidències).
+  // Viu aquí i no a Script Properties perquè NO és cap secret (el mateix URL va imprès en un QR
+  // a la paret) i perquè un botó que depengués d'una crida al backend tindria un mode de fallada
+  // a canvi de res. La neteja de la FASE 4 va del BACKEND (Form ID d'edició, Script ID), no
+  // d'aquesta config pública. Sense preemplenat: l'encàrrec no va lligat a cap màquina.
+  FORM_ENCARRECS_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSfLdQD6-Lh6aHJ_Si0z1iUiYSjSjGEv7z2Jhdnd8iU-3B_GTQ/viewform',
 };
 
 Object.freeze(FAIG_CONFIG);

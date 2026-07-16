@@ -157,6 +157,26 @@ window.API = (function () {
     },
   };
 
+  // ── Encàrrecs ──────────────────────────────────────────────
+
+  const encarrecs = {
+    // Només ADMIN. estat: qualsevol d'ENCARREC_ESTATS | 'totes'.
+    // Sense estat, el backend retorna els que NO estan tancats (ni Entregat ni Rebutjat).
+    getAll(estat) {
+      return call('getEncarrecs', estat ? { estat: estat } : {});
+    },
+    // Detall complet d'un encàrrec: parells pregunta→resposta de tota la fila.
+    get(id) {
+      return call('getEncarrec', { encarrec_id: id });
+    },
+    updateEstat(id, estat) {
+      return call('updateEstatEncarrec', {
+        encarrec_id: id,
+        estat:       estat,
+      });
+    },
+  };
+
   // ── Inventari ──────────────────────────────────────────────
 
   const inventari = {
@@ -214,6 +234,7 @@ window.API = (function () {
     horari,
     reserves,
     incidencies,
+    encarrecs,
     inventari,
     usuaris,
     dashboard,
