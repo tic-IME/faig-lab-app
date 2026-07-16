@@ -130,6 +130,19 @@ window.API = (function () {
   // ── Incidències ────────────────────────────────────────────
 
   const incidencies = {
+    // Només ADMIN. estat: 'Oberta' | 'En curs' | 'Resolta' | 'totes'.
+    // Sense estat, el backend retorna les que NO estan resoltes.
+    getAll(estat) {
+      return call('getIncidencies', estat ? { estat: estat } : {});
+    },
+    updateEstat(id, estat) {
+      return call('updateEstatIncidencia', {
+        incidencia_id: id,
+        estat:         estat,
+      });
+    },
+    // NOMÉS aquest mètode és a la llista de neteja diferida (crida createIncidencia,
+    // que des del Tram B ja no fa servir ningú). getAll i updateEstat són codi viu.
     create(maquinaId, ubicacio, urgencia, descripcio, correuCentre) {
       return call('createIncidencia', {
         maquina_id:    maquinaId,

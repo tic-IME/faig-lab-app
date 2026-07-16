@@ -4,8 +4,13 @@
 
 window.ModulIncidencies = (function () {
 
-  let _container = null;
-  let _maquines  = [];
+  // Els tres únics valors admesos. Han de coincidir EXACTAMENT amb INCIDENCIA_ESTATS
+  // del backend i amb la validació de dades de la columna Estat del full.
+  const ESTATS_INC = ['Oberta', 'En curs', 'Resolta'];
+
+  let _container   = null;
+  let _maquines    = [];   // carregades per a l'admin; les farà servir el Tram D3
+  let _incidencies = [];
 
   // ── init ──────────────────────────────────────────────────
 
@@ -70,7 +75,7 @@ window.ModulIncidencies = (function () {
       (Auth.isAdmin()
         ? '<div id="inc-llista-wrap">' +
             '<h3 style="font-size:.8rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
-                 'color:var(--col-text-muted);margin-bottom:.75rem;">Incidències recents (últimes 20)</h3>' +
+                 'color:var(--col-text-muted);margin-bottom:.75rem;">Incidències pendents</h3>' +
             '<div id="inc-llista"><div class="spinner-wrap"><div class="spinner"></div></div></div>' +
           '</div>'
         : '');
@@ -90,79 +95,111 @@ window.ModulIncidencies = (function () {
     wrap.innerHTML = '<div class="spinner-wrap" style="min-height:80px;"><div class="spinner"></div></div>';
 
     try {
-      // Reutilitza getAll màquines per no tenir endpoint nou; les incidències
-      // vénen del dashboard o d'una crida directa si s'implementa.
-      // Aquí fem una crida al dashboard per obtenir un resum,
-      // i mostrem les darreres 20 incidències del full via getMe de backup.
-      // Com que no hi ha endpoint específic getIncidencies, usem getDashboard
-      // per al resum i informem l'usuari.
-      const dash = await API.dashboard.get();
-      _renderLlistaResum(wrap, dash);
+      // Sense filtre: el backend retorna les que NO estan resoltes.
+      _incidencies = (await API.incidencies.getAll()) || [];
+      _renderLlista(wrap);
     } catch (err) {
       wrap.innerHTML = '<div class="empty-state" style="min-height:80px;">' +
-        '<p class="empty-state-desc">No s\'han pogut carregar les incidències recents.</p></div>';
+        '<p class="empty-state-title">No s\'han pogut carregar les incidències</p>' +
+        '<p class="empty-state-desc">' + _esc(err.message) + '</p></div>';
     }
   }
 
-  function _renderLlistaResum(wrap, dash) {
-    // El dashboard retorna incidencies_obertes (comptador).
-    // Mostrem un resum informatiu i l'estat de les màquines afectades.
-    const maquinesProblema = _maquines.filter(function (m) {
-      return ['Avariada', 'Revisió pendent', 'Standby - No disponible'].indexOf(m['Estat_Actual']) !== -1;
-    });
-
-    if (maquinesProblema.length === 0 && (!dash || dash.incidencies_obertes === 0)) {
+  function _renderLlista(wrap) {
+    if (_incidencies.length === 0) {
       wrap.innerHTML =
         '<div class="empty-state" style="min-height:80px;">' +
           '<span class="empty-state-icon">✅</span>' +
-          '<p class="empty-state-title">Cap incidència oberta</p>' +
-          '<p class="empty-state-desc">Totes les màquines estan operatives.</p>' +
+          '<p class="empty-state-title">Cap incidència pendent</p>' +
+          '<p class="empty-state-desc">No hi ha incidències obertes ni en curs.</p>' +
         '</div>';
       return;
     }
 
-    let html = '';
+    let html = '<div class="table-wrap"><table>' +
+      '<thead><tr>' +
+        '<th>Data</th>' +
+        '<th>Màquina</th>' +
+        '<th>Es pot fer servir?</th>' +
+        '<th>Reportada per</th>' +
+        '<th>Estat</th>' +
+        '<th>Gestionada per</th>' +
+      '</tr></thead><tbody>';
 
-    if (dash && dash.incidencies_obertes > 0) {
-      html += '<div style="padding:.6rem .875rem;border-radius:7px;margin-bottom:.875rem;' +
-              'background:#fef9c3;border:1px solid #fde68a;font-size:.85rem;color:#854d0e;">' +
-              '⚠️ Hi ha <strong>' + dash.incidencies_obertes + '</strong> incidències reportades els últims 30 dies.' +
-              '</div>';
-    }
+    _incidencies.forEach(function (inc) {
+      html += '<tr>' +
+        '<td>' + _esc(_formatData(inc.data)) + '</td>' +
+        '<td><strong>' + _esc(inc.maquina_id || '—') + '</strong></td>' +
+        '<td>' + _esc(inc.us || '—') + '</td>' +
+        '<td>' + _esc(inc.docent || '—') + '</td>' +
+        '<td>' + _selectorEstat(inc) + '</td>' +
+        '<td>' + _esc(inc.gestionada_per || '—') + '</td>' +
+      '</tr>';
+    });
 
-    if (maquinesProblema.length > 0) {
-      html += '<div class="table-wrap"><table>' +
-        '<thead><tr>' +
-          '<th>Màquina</th>' +
-          '<th>Tipus</th>' +
-          '<th>Ubicació</th>' +
-          '<th>Estat actual</th>' +
-        '</tr></thead>' +
-        '<tbody>';
-
-      maquinesProblema.forEach(function (m) {
-        const estat    = m['Estat_Actual'] || '';
-        const estatCls = {
-          'Avariada':               'estat-avariada',
-          'Revisió pendent':        'estat-revisio',
-          'Standby - No disponible':'estat-standby',
-        }[estat] || 'estat-standby';
-
-        html += '<tr>' +
-          '<td><strong>' + _esc(m['ID_Maquina'] || '') + '</strong></td>' +
-          '<td>' + _esc(m['Tipus_Maquina'] || '—') + '</td>' +
-          '<td>' + _esc(m['Ubicació'] || '—') + '</td>' +
-          '<td><span class="estat-badge ' + estatCls + '">' + _esc(estat) + '</span></td>' +
-        '</tr>';
-      });
-
-      html += '</tbody></table></div>';
-      html += '<p style="font-size:.78rem;color:var(--col-text-muted);margin-top:.5rem;">' +
-              'Per veure el detall complet de cada incidència, consulta el full <em>Incidències_Respostes</em> al Google Sheets.' +
-              '</p>';
-    }
-
+    html += '</tbody></table></div>';
     wrap.innerHTML = html;
+
+    wrap.querySelectorAll('.sel-estat-inc').forEach(function (sel) {
+      sel.dataset.anterior = sel.value;
+      sel.addEventListener('change', function () {
+        _canviaEstat(sel.dataset.id, sel.value, sel);
+      });
+    });
+  }
+
+  // Una fila sense ID vol dir que l'estampat automàtic ha fallat (el trigger
+  // registra els errors només al Logger). La mostrem, però sense selector:
+  // updateEstatIncidencia localitza la fila per ID i sense ID no hi ha res a fer.
+  function _selectorEstat(inc) {
+    const estat = inc.estat || '';
+
+    if (!inc.id) {
+      return '<span class="estat-badge estat-standby">Sense ID</span>' +
+             '<div style="font-size:.72rem;color:var(--col-text-muted);margin-top:.2rem;">' +
+             'Reviseu el full</div>';
+    }
+
+    const opcions = ESTATS_INC.map(function (e) {
+      return '<option value="' + _esc(e) + '"' + (estat === e ? ' selected' : '') + '>' + _esc(e) + '</option>';
+    }).join('');
+
+    return '<select class="sel-estat-inc" data-id="' + _esc(inc.id) + '" ' +
+           'style="font-size:.8rem;padding:.25rem .4rem;">' +
+           (ESTATS_INC.indexOf(estat) === -1
+             ? '<option value="" selected>' + _esc(estat || '(sense estat)') + '</option>'
+             : '') +
+           opcions + '</select>';
+  }
+
+  async function _canviaEstat(incidenciaId, nouEstat, sel) {
+    if (!nouEstat) return;
+
+    const anterior = sel.dataset.anterior || '';
+    if (!confirm('Canviar la incidència ' + incidenciaId + ' a "' + nouEstat + '"?')) {
+      sel.value = anterior;
+      return;
+    }
+
+    sel.disabled = true;
+    try {
+      await API.incidencies.updateEstat(incidenciaId, nouEstat);
+      Toast.ok('Incidència ' + incidenciaId + ' actualitzada a "' + nouEstat + '".');
+      // Recarreguem: si passa a "Resolta" ha de desaparèixer de la llista.
+      await _carregaLlista();
+    } catch (err) {
+      Toast.error('Error actualitzant la incidència: ' + err.message);
+      sel.value = anterior;
+      sel.disabled = false;
+    }
+  }
+
+  function _formatData(val) {
+    if (!val) return '—';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear() + ' ' +
+           String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
   // ── Utilitats ─────────────────────────────────────────────
