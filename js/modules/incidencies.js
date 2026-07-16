@@ -8,9 +8,20 @@ window.ModulIncidencies = (function () {
   // del backend i amb la validació de dades de la columna Estat del full.
   const ESTATS_INC = ['Oberta', 'En curs', 'Resolta'];
 
+  // Opcions del filtre. El valor buit és el que el backend entén com "no resoltes".
+  const FILTRES = [
+    { valor: '',        etiqueta: 'Obertes i en curs' },
+    { valor: 'Oberta',  etiqueta: 'Només obertes' },
+    { valor: 'En curs', etiqueta: 'Només en curs' },
+    { valor: 'Resolta', etiqueta: 'Només resoltes' },
+    { valor: 'totes',   etiqueta: 'Totes' },
+  ];
+
   let _container   = null;
   let _maquines    = [];   // carregades per a l'admin; les farà servir el Tram D3
   let _incidencies = [];
+  let _filtre      = '';
+  let _detalls     = {};   // cache id → camps, per no refer la crida en replegar i desplegar
 
   // ── init ──────────────────────────────────────────────────
 
@@ -74,14 +85,30 @@ window.ModulIncidencies = (function () {
       // ── Llista ADMIN ──
       (Auth.isAdmin()
         ? '<div id="inc-llista-wrap">' +
-            '<h3 style="font-size:.8rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
-                 'color:var(--col-text-muted);margin-bottom:.75rem;">Incidències pendents</h3>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;' +
+                 'gap:1rem;flex-wrap:wrap;margin-bottom:.75rem;">' +
+              '<h3 style="font-size:.8rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
+                   'color:var(--col-text-muted);margin:0;">Incidències</h3>' +
+              '<select id="inc-filtre" style="font-size:.8rem;padding:.25rem .4rem;">' +
+                FILTRES.map(function (f) {
+                  return '<option value="' + _esc(f.valor) + '"' +
+                         (_filtre === f.valor ? ' selected' : '') + '>' + _esc(f.etiqueta) + '</option>';
+                }).join('') +
+              '</select>' +
+            '</div>' +
             '<div id="inc-llista"><div class="spinner-wrap"><div class="spinner"></div></div></div>' +
           '</div>'
         : '');
 
     // Carrega llista si ADMIN
     if (Auth.isAdmin()) {
+      const filtre = document.getElementById('inc-filtre');
+      if (filtre) {
+        filtre.addEventListener('change', function () {
+          _filtre = filtre.value;
+          _carregaLlista();
+        });
+      }
       _carregaLlista();
     }
   }
@@ -96,7 +123,7 @@ window.ModulIncidencies = (function () {
 
     try {
       // Sense filtre: el backend retorna les que NO estan resoltes.
-      _incidencies = (await API.incidencies.getAll()) || [];
+      _incidencies = (await API.incidencies.getAll(_filtre)) || [];
       _renderLlista(wrap);
     } catch (err) {
       wrap.innerHTML = '<div class="empty-state" style="min-height:80px;">' +
@@ -107,11 +134,12 @@ window.ModulIncidencies = (function () {
 
   function _renderLlista(wrap) {
     if (_incidencies.length === 0) {
+      const etiqueta = (FILTRES.find(function (f) { return f.valor === _filtre; }) || {}).etiqueta || '';
       wrap.innerHTML =
         '<div class="empty-state" style="min-height:80px;">' +
           '<span class="empty-state-icon">✅</span>' +
-          '<p class="empty-state-title">Cap incidència pendent</p>' +
-          '<p class="empty-state-desc">No hi ha incidències obertes ni en curs.</p>' +
+          '<p class="empty-state-title">Cap incidència</p>' +
+          '<p class="empty-state-desc">No n\'hi ha cap amb el filtre "' + _esc(etiqueta) + '".</p>' +
         '</div>';
       return;
     }
@@ -127,7 +155,10 @@ window.ModulIncidencies = (function () {
       '</tr></thead><tbody>';
 
     _incidencies.forEach(function (inc) {
-      html += '<tr>' +
+      // Sense ID no hi ha detall possible: getIncidencia localitza la fila per ID.
+      html += '<tr' +
+        (inc.id ? ' class="fila-inc" style="cursor:pointer;"' : '') +
+        ' data-id="' + _esc(inc.id || '') + '">' +
         '<td>' + _esc(_formatData(inc.data)) + '</td>' +
         '<td><strong>' + _esc(inc.maquina_id || '—') + '</strong></td>' +
         '<td>' + _esc(inc.us || '—') + '</td>' +
@@ -138,6 +169,8 @@ window.ModulIncidencies = (function () {
     });
 
     html += '</tbody></table></div>';
+    html += '<p style="font-size:.78rem;color:var(--col-text-muted);margin-top:.5rem;">' +
+            'Fes clic a una incidència per veure la resposta completa del formulari.</p>';
     wrap.innerHTML = html;
 
     wrap.querySelectorAll('.sel-estat-inc').forEach(function (sel) {
@@ -146,6 +179,59 @@ window.ModulIncidencies = (function () {
         _canviaEstat(sel.dataset.id, sel.value, sel);
       });
     });
+
+    wrap.querySelectorAll('.fila-inc').forEach(function (tr) {
+      tr.addEventListener('click', function (ev) {
+        // El selector d'estat viu dins la fila: no ha d'obrir el detall.
+        if (ev.target.closest('select')) return;
+        _toggleDetall(tr);
+      });
+    });
+  }
+
+  // ── Detall d'una incidència (D2) ──────────────────────────
+
+  async function _toggleDetall(tr) {
+    const id = tr.dataset.id;
+    const seguent = tr.nextElementSibling;
+
+    if (seguent && seguent.classList.contains('fila-detall')) {
+      seguent.remove();
+      return;
+    }
+
+    const detall = document.createElement('tr');
+    detall.className = 'fila-detall';
+    detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);">' +
+                       '<div class="spinner-wrap" style="min-height:60px;"><div class="spinner"></div></div></td>';
+    tr.insertAdjacentElement('afterend', detall);
+
+    try {
+      if (!_detalls[id]) {
+        const res = await API.incidencies.get(id);
+        _detalls[id] = (res && res.camps) || [];
+      }
+      detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);padding:.875rem;">' +
+                         _renderCamps(_detalls[id]) + '</td>';
+    } catch (err) {
+      detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);padding:.875rem;' +
+                         'font-size:.82rem;color:var(--col-text-muted);">' +
+                         'No s\'ha pogut carregar el detall: ' + _esc(err.message) + '</td>';
+    }
+  }
+
+  function _renderCamps(camps) {
+    if (!camps || camps.length === 0) {
+      return '<p style="font-size:.82rem;color:var(--col-text-muted);margin:0;">Sense respostes registrades.</p>';
+    }
+
+    return '<dl style="margin:0;display:grid;grid-template-columns:minmax(180px,1fr) 2fr;gap:.4rem .875rem;">' +
+      camps.map(function (c) {
+        return '<dt style="font-size:.78rem;font-weight:600;color:var(--col-text-muted);">' +
+                 _esc(c.pregunta) + '</dt>' +
+               '<dd style="font-size:.82rem;margin:0;white-space:pre-wrap;">' + _esc(c.resposta) + '</dd>';
+      }).join('') +
+    '</dl>';
   }
 
   // Una fila sense ID vol dir que l'estampat automàtic ha fallat (el trigger
@@ -185,7 +271,9 @@ window.ModulIncidencies = (function () {
     try {
       await API.incidencies.updateEstat(incidenciaId, nouEstat);
       Toast.ok('Incidència ' + incidenciaId + ' actualitzada a "' + nouEstat + '".');
-      // Recarreguem: si passa a "Resolta" ha de desaparèixer de la llista.
+      // El detall conté les columnes d'estat de la fila: la cache queda obsoleta.
+      delete _detalls[incidenciaId];
+      // Recarreguem: amb el filtre per defecte, una "Resolta" desapareix de la llista.
       await _carregaLlista();
     } catch (err) {
       Toast.error('Error actualitzant la incidència: ' + err.message);

@@ -135,6 +135,10 @@ window.API = (function () {
     getAll(estat) {
       return call('getIncidencies', estat ? { estat: estat } : {});
     },
+    // Detall complet d'una incidència: parells pregunta→resposta de tota la fila.
+    get(id) {
+      return call('getIncidencia', { incidencia_id: id });
+    },
     updateEstat(id, estat) {
       return call('updateEstatIncidencia', {
         incidencia_id: id,

@@ -112,10 +112,10 @@ window.ModulDashboard = (function () {
       alertesEstoc.length === 0 ? '#dcfce7' : '#fee2e2',
       alertesEstoc.length === 0 ? '#166534' : '#991b1b');
 
-    html += _metricCard('📋', 'Incidències (30 dies)',
+    html += _metricCard('📋', 'Incidències obertes',
       dash.incidencies_obertes || 0,
-      'Reportades el darrer mes',
-      '#fef9c3', '#854d0e');
+      (dash.incidencies_obertes || 0) === 0 ? 'Cap incidència pendent' : 'Obertes o en curs',
+      '#fef9c3', '#854d0e', 'incidencies');
 
     const reservesSusp = reservesSuspeses.length;
     html += _metricCard('🔶', 'Reserves suspeses',
@@ -236,6 +236,14 @@ window.ModulDashboard = (function () {
 
     // ── Listeners ──
 
+    cos.querySelectorAll('.lnk-modul').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        const nav = document.querySelector('.nav-item[data-module="' + a.dataset.module + '"]');
+        if (nav) nav.click();
+      });
+    });
+
     cos.querySelectorAll('.btn-resolt-maq').forEach(function (btn) {
       btn.addEventListener('click', function () {
         _marcaResolta(btn.dataset.id, btn);
@@ -307,7 +315,10 @@ window.ModulDashboard = (function () {
 
   // ── Components HTML ───────────────────────────────────────
 
-  function _metricCard(icon, titol, valor, desc, bgColor, textColor) {
+  // moduleLink (opcional): nom del mòdul al qual enllaça la targeta. La navegació
+  // reaprofita el clic del nav-item de la barra lateral; no hi ha listener de
+  // hashchange a index.html, o sigui que un href="#modul" sol no carregaria res.
+  function _metricCard(icon, titol, valor, desc, bgColor, textColor, moduleLink) {
     return '<div class="card" style="border-left:4px solid ' + textColor + ';">' +
       '<div style="display:flex;align-items:center;gap:.625rem;margin-bottom:.4rem;">' +
         '<span style="font-size:1.3rem;">' + icon + '</span>' +
@@ -315,6 +326,10 @@ window.ModulDashboard = (function () {
       '</div>' +
       '<p style="font-size:2rem;font-weight:800;color:' + textColor + ';line-height:1;">' + _esc(String(valor)) + '</p>' +
       '<p style="font-size:.78rem;color:var(--col-text-muted);margin-top:.3rem;">' + _esc(desc) + '</p>' +
+      (moduleLink
+        ? '<a href="#' + _esc(moduleLink) + '" class="lnk-modul" data-module="' + _esc(moduleLink) + '" ' +
+          'style="font-size:.78rem;margin-top:.45rem;display:inline-block;">Veure el detall →</a>'
+        : '') +
     '</div>';
   }
 
