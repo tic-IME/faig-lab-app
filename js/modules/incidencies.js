@@ -17,6 +17,12 @@ window.ModulIncidencies = (function () {
     { valor: 'totes',   etiqueta: 'Totes' },
   ];
 
+  // Fons del panell de detall. --col-bg és el fons de pàgina i --col-surface el de
+  // la targeta: fer-los servir així dona el contrast d'encaix en tots dos temes.
+  // NO inventar variables: --col-bg-alt no existeix i el fallback pintava el panell
+  // gairebé blanc en tema fosc, amb el text també blanc a sobre (incident 16/07/2026).
+  const CEL_DETALL = 'background:var(--col-bg);border-top:1px solid var(--col-border);';
+
   let _container   = null;
   let _maquines    = [];   // carregades per a l'admin; les farà servir el Tram D3
   let _incidencies = [];
@@ -202,7 +208,7 @@ window.ModulIncidencies = (function () {
 
     const detall = document.createElement('tr');
     detall.className = 'fila-detall';
-    detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);">' +
+    detall.innerHTML = '<td colspan="6" style="' + CEL_DETALL + '">' +
                        '<div class="spinner-wrap" style="min-height:60px;"><div class="spinner"></div></div></td>';
     tr.insertAdjacentElement('afterend', detall);
 
@@ -211,10 +217,10 @@ window.ModulIncidencies = (function () {
         const res = await API.incidencies.get(id);
         _detalls[id] = (res && res.camps) || [];
       }
-      detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);padding:.875rem;">' +
+      detall.innerHTML = '<td colspan="6" style="' + CEL_DETALL + 'padding:.875rem;">' +
                          _renderCamps(_detalls[id]) + '</td>';
     } catch (err) {
-      detall.innerHTML = '<td colspan="6" style="background:var(--col-bg-alt,#f8fafc);padding:.875rem;' +
+      detall.innerHTML = '<td colspan="6" style="' + CEL_DETALL + 'padding:.875rem;' +
                          'font-size:.82rem;color:var(--col-text-muted);">' +
                          'No s\'ha pogut carregar el detall: ' + _esc(err.message) + '</td>';
     }
@@ -225,13 +231,28 @@ window.ModulIncidencies = (function () {
       return '<p style="font-size:.82rem;color:var(--col-text-muted);margin:0;">Sense respostes registrades.</p>';
     }
 
-    return '<dl style="margin:0;display:grid;grid-template-columns:minmax(180px,1fr) 2fr;gap:.4rem .875rem;">' +
+    // La resposta és la dada principal: --col-text (15.6:1 clar, 15.7:1 fosc).
+    // La pregunta és l'etiqueta: --col-text-muted, el to estàndard de l'app
+    // (6.07:1 en fosc; 4.47:1 en clar, just per sota de l'AA de 4.5 — és el
+    // mateix valor que ja tenen els subtítols de mòdul sobre --col-bg, no una
+    // regressió d'aquí: esmenar-ho seria canviar el token global del tema).
+    return '<dl style="margin:0;display:grid;grid-template-columns:minmax(180px,1fr) 2fr;gap:.5rem .875rem;">' +
       camps.map(function (c) {
         return '<dt style="font-size:.78rem;font-weight:600;color:var(--col-text-muted);">' +
                  _esc(c.pregunta) + '</dt>' +
-               '<dd style="font-size:.82rem;margin:0;white-space:pre-wrap;">' + _esc(c.resposta) + '</dd>';
+               '<dd style="font-size:.85rem;margin:0;white-space:pre-wrap;line-height:1.5;' +
+                 'color:var(--col-text);">' + _esc(_formatValor(c.resposta)) + '</dd>';
       }).join('') +
     '</dl>';
+  }
+
+  // El backend serialitza les dates del full com a ISO (_incidenciaValorText).
+  // Les tornem a hora local amb el mateix format que la columna Data de la llista.
+  const ISO_DATA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+  function _formatValor(val) {
+    const s = String(val || '');
+    return ISO_DATA.test(s) ? _formatData(s) : s;
   }
 
   // Una fila sense ID vol dir que l'estampat automàtic ha fallat (el trigger
