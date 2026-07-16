@@ -122,6 +122,16 @@ window.API = (function () {
         grup_projecte:       grupProjecte      || '',
       });
     },
+    // Lot de reserves (Capa 1). items: [{ maquina_id, data, hora_inici, hora_fi }].
+    // Política parcial-amb-avís: retorna { creades, rebutjades: [{..., motiu}] }.
+    // L'endpoint és genèric — no assumeix que els items comparteixin franja — així
+    // que la Capa 2 (una màquina, N franges) hi cabrà sense tocar el backend.
+    createMultiple(items, grupProjecte) {
+      return call('createReserves', {
+        items:         items || [],
+        grup_projecte: grupProjecte || '',
+      });
+    },
     cancel(id) {
       return call('cancelReserva', { reserva_id: id });
     },

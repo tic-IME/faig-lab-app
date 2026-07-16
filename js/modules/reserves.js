@@ -17,6 +17,7 @@ window.ModulReserves = (function () {
   let _container  = null;
   let _calendar   = null;
   let _pendingRes = null;
+  let _maquines   = [];   // Control_Màquines de la selecció en curs (Capa 1)
 
   // ══════════════════════════════════════════════════
   //  INIT
@@ -183,51 +184,112 @@ window.ModulReserves = (function () {
   }
 
   // ── Selecció franja nova ───────────────────────────
+  // Capa 1: N màquines a la MATEIXA franja (sessió de grup). Caselles de selecció
+  // en lloc del desplegable d'una sola màquina: sense infraestructura d'UI al
+  // projecte, és el control més robust i no depèn de cap llibreria nova.
   function _onSlotSelect(info) {
-    _pendingRes = { inici: info.startStr, fi: info.endStr };
+    _pendingRes = { inici: info.startStr, fi: info.endStr, maquines: [] };
+    _maquines   = [];
 
     document.getElementById('res-modal-title').textContent = 'Nova reserva';
     document.getElementById('res-modal-body').innerHTML = `
       <p><strong>Franja:</strong> ${_fmt(info.start)} – ${_fmtHora(info.end)}</p>
-      <label class="form-label mt-2">Màquina:</label>
-      <select id="sel-maquina" class="form-select">
-        <option value="">Carregant màquines…</option>
-      </select>
+      <label class="form-label mt-2">Màquines:</label>
+      <p class="text-muted small mb-2">
+        Pots seleccionar-ne més d'una per a la mateixa franja.
+      </p>
+      <div id="maq-llista" class="border rounded p-2" style="max-height:16rem;overflow-y:auto;">
+        <div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>
+      </div>
+      <div id="maq-avis" class="form-text mt-2"></div>
     `;
-    document.getElementById('res-modal-ok').textContent = 'Continuar';
-    document.getElementById('res-modal-ok').onclick = function () {
-      const maq = document.getElementById('sel-maquina').value;
-      if (!maq) { alert('Has de seleccionar una màquina.'); return; }
-      _pendingRes.maquina_id = maq;
+    const btnOk = document.getElementById('res-modal-ok');
+    btnOk.textContent = 'Continuar';
+    btnOk.disabled    = true;
+    btnOk.onclick = function () {
+      const sel = _seleccionades();
+      if (!sel.length) { _toast('Has de seleccionar almenys una màquina.', 'warning'); return; }
+      _pendingRes.maquines = sel;
       _hideModal('res-modal');
-      _openChecklist(maq);
+      _openChecklist(sel);
     };
     _showModal('res-modal');
 
-    // El desplegable es genera des de Control_Màquines (font de veritat):
-    // així el taller de cada màquina sempre coincideix amb el full, i les
-    // màquines no operatives surten desactivades.
+    // La llista es genera des de Control_Màquines (font de veritat): així el taller
+    // de cada màquina sempre coincideix amb el full, i les màquines no operatives
+    // surten desactivades. El backend ho torna a comprovar: aquest filtre és
+    // comoditat, no la garantia.
     API.maquines.getAll()
       .then(function (maquines) {
-        const sel = document.getElementById('sel-maquina');
-        if (!sel) return;
-        const llista = (Array.isArray(maquines) ? maquines : [])
+        const cont = document.getElementById('maq-llista');
+        if (!cont) return;
+        _maquines = (Array.isArray(maquines) ? maquines : [])
           .filter(function (m) { return m && m['ID_Maquina']; });
-        let opts = '<option value="">— Escull una màquina —</option>';
-        llista.forEach(function (m) {
+
+        if (!_maquines.length) {
+          cont.innerHTML = '<p class="text-danger small mb-0">No hi ha cap màquina a Control_Màquines.</p>';
+          return;
+        }
+
+        cont.innerHTML = _maquines.map(function (m, i) {
           const id  = m['ID_Maquina'];
           const ubi = m['Ubicació'] || '';
           const est = String(m['Estat_Actual'] || '');
-          const operativa = est.toLowerCase().indexOf('operativa') !== -1;
-          const etiqueta = id + (ubi ? ' · ' + ubi : '') + (operativa ? '' : ' — ' + est);
-          opts += '<option value="' + id + '"' + (operativa ? '' : ' disabled') + '>' + etiqueta + '</option>';
+          const operativa = _esOperativa(est);
+          return `
+            <label class="d-flex gap-2 align-items-start py-1 ${operativa ? '' : 'opacity-50'}" for="maq-${i}">
+              <input class="form-check-input flex-shrink-0 mt-1 maq-cb" type="checkbox"
+                     id="maq-${i}" value="${id}" data-protocol="${m['ID_Protocol'] || ''}"
+                     ${operativa ? '' : 'disabled'}>
+              <span class="small">
+                <strong>${id}</strong>${ubi ? ' <span class="text-muted">· ' + ubi + '</span>' : ''}
+                ${operativa ? '' : '<br><span class="text-muted">' + est + '</span>'}
+              </span>
+            </label>`;
+        }).join('');
+
+        document.querySelectorAll('.maq-cb').forEach(function (cb) {
+          cb.addEventListener('change', _onMaquinaToggle);
         });
-        sel.innerHTML = opts;
       })
       .catch(function () {
-        const sel = document.getElementById('sel-maquina');
-        if (sel) sel.innerHTML = '<option value="">No s\'han pogut carregar les màquines</option>';
+        const cont = document.getElementById('maq-llista');
+        if (cont) cont.innerHTML = '<p class="text-danger small mb-0">No s\'han pogut carregar les màquines.</p>';
       });
+  }
+
+  function _esOperativa(estat) {
+    return String(estat || '').toLowerCase().indexOf('operativa') !== -1;
+  }
+
+  function _seleccionades() {
+    return Array.from(document.querySelectorAll('.maq-cb:checked'))
+                .map(function (cb) { return cb.value; });
+  }
+
+  // El checklist de seguretat és per PROTOCOL, no per màquina ni per lot a cegues:
+  // un sol checklist només val si totes les màquines del lot comparteixen
+  // ID_Protocol (les 5 Enders sí; un làser i una Ender no). Mentre hi hagi res
+  // seleccionat, bloquegem les màquines d'altres protocols.
+  function _onMaquinaToggle() {
+    const marcades = Array.from(document.querySelectorAll('.maq-cb:checked'));
+    const protocol = marcades.length ? marcades[0].dataset.protocol : null;
+
+    document.querySelectorAll('.maq-cb').forEach(function (cb) {
+      if (cb.checked) return;
+      const maq = _maquines.find(function (m) { return m['ID_Maquina'] === cb.value; });
+      const operativa = maq && _esOperativa(maq['Estat_Actual']);
+      cb.disabled = !operativa || (protocol !== null && cb.dataset.protocol !== protocol);
+      cb.closest('label').classList.toggle('opacity-50', cb.disabled);
+    });
+
+    const avis = document.getElementById('maq-avis');
+    if (avis) {
+      avis.textContent = marcades.length > 1
+        ? marcades.length + ' màquines seleccionades — un sol protocol de seguretat per a totes.'
+        : (protocol !== null ? 'Només pots afegir màquines del mateix protocol de seguretat.' : '');
+    }
+    document.getElementById('res-modal-ok').disabled = (marcades.length === 0);
   }
 
   // ── Clic reserva existent ──────────────────────────
@@ -269,7 +331,9 @@ window.ModulReserves = (function () {
   // ══════════════════════════════════════════════════
   //  CHECKLIST
   // ══════════════════════════════════════════════════
-  function _openChecklist(maquinaId) {
+  // maquines: array d'IDs, totes del mateix ID_Protocol (ho garanteix _onMaquinaToggle).
+  // Per això un sol checklist val per a tot el lot i el demanem per a la primera.
+  function _openChecklist(maquines) {
     const body  = document.getElementById('checklist-body');
     const btnOk = document.getElementById('btn-checklist-ok');
     body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning"></div></div>';
@@ -277,27 +341,31 @@ window.ModulReserves = (function () {
     document.getElementById('checklist-notes-wrap').classList.add('d-none');
     _showModal('checklist-modal');
 
-    API.protocols.get(maquinaId)
+    API.protocols.get(maquines[0])
       .then(function (res) {
         if (!res.items || !res.items.length) {
           body.innerHTML = '<p class="text-danger">No s\'ha pogut carregar el protocol.</p>';
           return;
         }
-        _renderItems(res.maquina_id, res.items);
+        _renderItems(maquines, res.items);
       })
       .catch(function () {
         body.innerHTML = '<p class="text-danger">Error de connexió.</p>';
       });
   }
 
-  function _renderItems(nomMaquina, items) {
+  function _renderItems(maquines, items) {
     const body  = document.getElementById('checklist-body');
     const btnOk = document.getElementById('btn-checklist-ok');
     document.getElementById('checklist-notes-wrap').classList.remove('d-none');
 
+    const etiqueta = maquines.length === 1
+      ? 'la reserva de <strong>' + maquines[0] + '</strong>'
+      : 'les <strong>' + maquines.length + ' reserves</strong> (' + maquines.join(', ') + ')';
+
     body.innerHTML = `
       <p class="text-muted mb-3">
-        Abans de confirmar la reserva de <strong>${nomMaquina}</strong>,
+        Abans de confirmar ${etiqueta},
         has d'acceptar tots els punts del protocol:
       </p>
       <div class="list-group list-group-flush">
@@ -332,50 +400,107 @@ window.ModulReserves = (function () {
     });
   }
 
-function _submitReserva() {
-  const btnOk = document.getElementById('btn-checklist-ok');
-  btnOk.disabled = true;
-  btnOk.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardant…';
+  function _submitReserva() {
+    const btnOk = document.getElementById('btn-checklist-ok');
+    btnOk.disabled  = true;
+    btnOk.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardant…';
 
-  const notes = (document.getElementById('checklist-notes') || {}).value || '';
-  const items = Array.from(document.querySelectorAll('.checklist-cb:checked'))
-                     .map(function (cb) { return cb.id; }).join(',');
+    const notes      = (document.getElementById('checklist-notes') || {}).value || '';
+    const itemsTotal = document.querySelectorAll('.checklist-cb').length;
+    const inici      = new Date(_pendingRes.inici);
+    const fi         = new Date(_pendingRes.fi);
 
-  const inici  = new Date(_pendingRes.inici);
-  const fi     = new Date(_pendingRes.fi);
-  const data   = inici.toISOString().slice(0, 10);
-  const horaInici = ('0' + inici.getHours()).slice(-2) + ':' + ('0' + inici.getMinutes()).slice(-2);
-  const horaFi    = ('0' + fi.getHours()).slice(-2)    + ':' + ('0' + fi.getMinutes()).slice(-2);
+    // Data en LOCAL, mai amb toISOString(): és UTC i una sèrie generada per
+    // aritmètica (Capa 2) podria caure al dia anterior. Avui no es notava perquè
+    // el calendari comença a les 08:00, però la trampa hi era.
+    const data      = _dataLocal(inici);
+    const horaInici = _horaLocal(inici);
+    const horaFi    = _horaLocal(fi);
 
-  API.reserves.create(_pendingRes.maquina_id, data, horaInici, horaFi, '', notes)
-    .then(function (res) {
-      const reservaId = res.id || '';
-      return API.protocols.registreChecklist({
-        maquina_id:     _pendingRes.maquina_id,
-        inici:          _pendingRes.inici,
-        fi:             _pendingRes.fi,
-        notes:          notes,
-        reserva_id:     reservaId,
-        id_protocol:    _pendingRes.maquina_id,
-        bloc_completat: 'INICI,DURANT,TANCAMENT',
-        items_total:    document.querySelectorAll('.checklist-cb').length,
-        items_validats: items,
-      });
-    })
-    .then(function () {
-      _hideModal('checklist-modal');
-      _pendingRes = null;
-      btnOk.disabled    = false;
-      btnOk.textContent = 'Confirmar reserva';
-      _toast('Reserva creada correctament! ✓', 'success');
-      _calendar && _calendar.refetchEvents();
-    })
-    .catch(function (err) {
-      _toast((err && err.message) || 'Error en crear la reserva.', 'danger');
-      btnOk.disabled    = false;
-      btnOk.textContent = 'Confirmar reserva';
+    const items = _pendingRes.maquines.map(function (id) {
+      return { maquina_id: id, data: data, hora_inici: horaInici, hora_fi: horaFi };
     });
-}
+    const franja = { inici: _pendingRes.inici, fi: _pendingRes.fi };
+
+    _creaReserves(items, notes)
+      .then(function (res) {
+        const creades    = (res && res.creades)    || [];
+        const rebutjades = (res && res.rebutjades) || [];
+        return _registraChecklists(creades, franja, notes, itemsTotal)
+          .then(function () { return { creades: creades, rebutjades: rebutjades }; });
+      })
+      .then(function (r) {
+        _hideModal('checklist-modal');
+        _pendingRes = null;
+        _restauraBoto(btnOk);
+        _avisaResultat(r.creades, r.rebutjades);
+        _calendar && _calendar.refetchEvents();
+      })
+      .catch(function (err) {
+        _toast((err && err.message) || 'Error en crear la reserva.', 'danger');
+        _restauraBoto(btnOk);
+      });
+  }
+
+  // UNA màquina → createReserva (el camí de producció de sempre, intacte).
+  // N màquines → createReserves (lot amb política parcial-amb-avís). No unifiquem:
+  // amb una sola màquina no hi ha res "parcial" i no volem tocar el camí verificat.
+  function _creaReserves(items, notes) {
+    if (items.length === 1) {
+      const it = items[0];
+      return API.reserves.create(it.maquina_id, it.data, it.hora_inici, it.hora_fi, '', notes)
+        .then(function (res) {
+          return {
+            creades:    [{ id: (res && res.id) || '', maquina_id: it.maquina_id }],
+            rebutjades: [],
+          };
+        });
+    }
+    return API.reserves.createMultiple(items, notes);
+  }
+
+  // Una fila de checklist per reserva creada: conserva la traçabilitat per màquina
+  // que ja hi havia a Registre_Checklists. Seqüencial per no encavalcar escriptures.
+  // Les rebutjades no en generen cap: no hi ha reserva a què lligar-les.
+  function _registraChecklists(creades, franja, notes, itemsTotal) {
+    return creades.reduce(function (cadena, r) {
+      return cadena.then(function () {
+        return API.protocols.registreChecklist({
+          maquina_id:     r.maquina_id,
+          inici:          franja.inici,
+          fi:             franja.fi,
+          notes:          notes,
+          reserva_id:     r.id || '',
+          id_protocol:    r.maquina_id,
+          bloc_completat: 'INICI,DURANT,TANCAMENT',
+          items_total:    itemsTotal,
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  function _avisaResultat(creades, rebutjades) {
+    const ok = creades.map(function (r) { return r.maquina_id; });
+    const ko = rebutjades.map(function (r) { return r.maquina_id + ' (' + r.motiu + ')'; });
+
+    if (ok.length && !ko.length) {
+      _toast(ok.length === 1
+        ? 'Reserva creada correctament! ✓'
+        : ok.length + ' reserves creades: ' + ok.join(', ') + ' ✓', 'success');
+      return;
+    }
+    if (ok.length && ko.length) {
+      _toast('Reservades: ' + ok.join(', ') + '.\n\n' +
+             'No s\'han pogut reservar: ' + ko.join(', ') + '.', 'warning');
+      return;
+    }
+    _toast('No s\'ha pogut reservar cap màquina.\n\n' + ko.join('\n'), 'danger');
+  }
+
+  function _restauraBoto(btnOk) {
+    btnOk.disabled    = false;
+    btnOk.textContent = 'Confirmar reserva';
+  }
 
   // ══════════════════════════════════════════════════
   //  UTILITATS
@@ -396,6 +521,18 @@ function _submitReserva() {
     return (str || '').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+  }
+  // Data i hora LOCALS (Europe/Madrid al navegador del centre). Mai toISOString():
+  // convertiria a UTC i podria desplaçar el dia. El full espera 'AAAA-MM-DD' i
+  // 'HH:MM' amb zero al davant — la comparació de franges del backend és
+  // lexicogràfica i '9:00' la trencaria.
+  function _dataLocal(d) {
+    return d.getFullYear() + '-' +
+           ('0' + (d.getMonth() + 1)).slice(-2) + '-' +
+           ('0' + d.getDate()).slice(-2);
+  }
+  function _horaLocal(d) {
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
   }
   function _fmt(d) {
     return new Date(d).toLocaleString('ca-ES', {
