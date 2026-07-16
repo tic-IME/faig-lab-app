@@ -14,10 +14,16 @@ window.ModulReserves = (function () {
     default:     '#7f8c8d',
   };
 
+  // Indexat per getDay() (0 = diumenge), que és el que retorna Date. Els valors
+  // han de coincidir EXACTAMENT amb la columna Dia_Nom d'Horari_Tallers, que
+  // només conté de Dilluns a Divendres.
+  const DIES_NOM = ['Diumenge', 'Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte'];
+
   let _container  = null;
   let _calendar   = null;
   let _pendingRes = null;
   let _maquines   = [];   // Control_Màquines de la selecció en curs (Capa 1)
+  let _horaris    = null; // Graella d'Horari_Tallers, només files AMB classe. Cau.
 
   // ══════════════════════════════════════════════════
   //  INIT
@@ -199,6 +205,178 @@ window.ModulReserves = (function () {
     return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : '';
   }
 
+  // ══════════════════════════════════════════════════
+  //  HORARI DE TALLERS — avís de classe programada
+  // ══════════════════════════════════════════════════
+  // Horari_Tallers NO és una llista de classes: és una GRAELLA EXHAUSTIVA de
+  // franges de 30 min (8:00-16:00, dilluns-divendres, els dos tallers). Les
+  // franges lliures hi són, amb Assignatura_Grup buit. "Hi ha classe" = fila
+  // solapada AMB Assignatura_Grup NO BUIT; sense aquest filtre, l'avís saltaria
+  // a totes hores.
+  //
+  // ELS DOS MÓNS DE FORMATS (font d'error nº1 del projecte): les hores de
+  // Reserves són text 'HH:MM' amb capçalera en MAJÚSCULA (Hora_Inici); les
+  // d'Horari_Tallers són valors d'hora amb capçalera en MINÚSCULA (Hora_inici).
+  // El backend ja les normalitza totes dues a 'HH:MM' amb zero al davant, que és
+  // l'únic format on la comparació lexicogràfica de _solapa és vàlida.
+  //
+  // És una plantilla SETMANAL (per Dia_Nom), no un calendari de dates: es carrega
+  // un cop i val per a totes les setmanes.
+  function _carregaHoraris() {
+    if (_horaris) return Promise.resolve(_horaris);
+    // taller buit → el backend retorna la graella sencera dels dos tallers.
+    return API.horari.getSetmana('').then(function (files) {
+      _horaris = (Array.isArray(files) ? files : []).filter(function (h) {
+        return h && String(h['Assignatura_Grup'] || '').trim() !== '';
+      });
+      return _horaris;
+    });
+  }
+
+  // 'AAAA-MM-DD' → 'Dilluns'…'Diumenge'. Construïda a partir de les PECES, mai
+  // amb new Date(cadena): això parseja en UTC i pot caure al dia anterior. És el
+  // mateix perill que el toISOString que vam treure a la Capa 1.
+  function _diaNom(dataStr) {
+    const p = String(dataStr).split('-');
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return DIES_NOM[d.getDay()];
+  }
+
+  function _solapa(ini1, fi1, ini2, fi2) {
+    return ini1 < fi2 && fi1 > ini2;
+  }
+
+  // Files contigües de 30 min de la mateixa classe → un sol bloc.
+  // ET2n1Tecno dilluns = 13:00 + 13:30 + 14:00 → un avís "de 13:00 a 14:30",
+  // no tres. Es fusionen les files de la mateixa assignatura al mateix taller
+  // quan la fi d'una arriba a l'inici de la següent.
+  function _blocsClasse(files) {
+    const grups = {};
+    files.forEach(function (h) {
+      const clau = [h['Assignatura_Grup'], h['Ubicació'], h['Professor_titular']].join('|');
+      (grups[clau] = grups[clau] || []).push(h);
+    });
+
+    const blocs = [];
+    Object.keys(grups).forEach(function (clau) {
+      const files = grups[clau].slice().sort(function (a, b) {
+        return String(a['Hora_inici']).localeCompare(String(b['Hora_inici']));
+      });
+      let actual = null;
+      files.forEach(function (h) {
+        if (actual && String(h['Hora_inici']) <= actual.fi) {
+          // Contigua o encavalcada: allarga el bloc.
+          if (String(h['Hora_final']) > actual.fi) actual.fi = String(h['Hora_final']);
+          return;
+        }
+        actual = {
+          assignatura: h['Assignatura_Grup'],
+          professor:   h['Professor_titular'] || '',
+          correu:      String(h['Correu_Titular'] || '').trim().toLowerCase(),
+          taller:      h['Ubicació'],
+          ini:         String(h['Hora_inici']),
+          fi:          String(h['Hora_final']),
+        };
+        blocs.push(actual);
+      });
+    });
+    return blocs;
+  }
+
+  // Blocs de classe que creuen la franja als tallers donats.
+  function _classesEnFranja(tallers, dataStr, horaIni, horaFi) {
+    const diaNom = _diaNom(dataStr);
+    const files  = _horaris.filter(function (h) {
+      return h['Dia_Nom'] === diaNom && tallers.indexOf(h['Ubicació']) !== -1;
+    });
+    return _blocsClasse(files).filter(function (b) {
+      return _solapa(b.ini, b.fi, horaIni, horaFi);
+    });
+  }
+
+  // Confirmació prèvia a l'enviament quan la franja té classe programada.
+  // Retorna Promise<bool>: true = endavant.
+  //
+  // NO hi ha bloqueig dur: avui NINGÚ té nivell ALUMNE (validateToken només
+  // retorna ADMIN o USUARI) i l'alumnat no reserva. Per a USUARI/ADMIN la
+  // reserva és permesa i la decisió és humana, així que no hi ha res a revalidar
+  // al backend: un confirm() no es pot reproduir al servidor. Quan existeixi el
+  // grup gestor, la regla de bloqueig entrarà per _reservaMotiuRebuig (el seu
+  // objecte de context ja hi és preparat).
+  function _confirmaClasses(maquines, dataStr, horaIni, horaFi) {
+    return _carregaHoraris()
+      .then(function () {
+        const jo = (typeof Auth !== 'undefined' && Auth.getUser())
+          ? String(Auth.getUser().email || '').trim().toLowerCase() : '';
+
+        // Taller de cada màquina, des d'Ubicació de Control_Màquines (font de
+        // veritat). GUARDA: si una màquina no en té, no podem saber si hi ha
+        // classe — ho diem, no ho callem.
+        const tallers   = [];
+        const senseInfo = [];
+        maquines.forEach(function (id) {
+          const m   = _maquines.find(function (x) { return x['ID_Maquina'] === id; });
+          const ubi = m ? String(m['Ubicació'] || '').trim() : '';
+          if (!ubi) { senseInfo.push(id); return; }
+          if (tallers.indexOf(ubi) === -1) tallers.push(ubi);
+        });
+
+        // GUARDA a l'inrevés: una classe en una ubicació que no és de cap
+        // màquina no la creuaria ningú i passaria desapercebuda.
+        const ubiMaquines = _maquines
+          .map(function (m) { return String(m['Ubicació'] || '').trim(); })
+          .filter(Boolean);
+        const orfes = [];
+        _horaris.forEach(function (h) {
+          const u = String(h['Ubicació'] || '').trim();
+          if (u && ubiMaquines.indexOf(u) === -1 && orfes.indexOf(u) === -1) orfes.push(u);
+        });
+        if (orfes.length) {
+          console.warn('[Reserves] Ubicacions d\'Horari_Tallers que no casen amb cap Ubicació de Control_Màquines:', orfes);
+        }
+
+        const blocs = tallers.length ? _classesEnFranja(tallers, dataStr, horaIni, horaFi) : [];
+        if (!blocs.length && !senseInfo.length) return true;
+
+        const meves  = blocs.filter(function (b) { return jo && b.correu === jo; });
+        const alienes = blocs.filter(function (b) { return !jo || b.correu !== jo; });
+
+        let msg = '';
+        if (blocs.length) {
+          msg += 'Aquesta franja té classe programada:\n\n';
+          blocs.forEach(function (b) {
+            const qui = b.correu
+              ? (b.professor || b.correu)
+              : 'sense titular indicat';
+            msg += '• ' + b.assignatura + ' (' + qui + ') · ' + b.taller +
+                   ' · ' + b.ini + '–' + b.fi +
+                   (jo && b.correu === jo ? ' — és la teva classe' : '') + '\n';
+          });
+          msg += '\n';
+          // Titular de TOTES → recordatori positiu. Qualsevol classe d'algú
+          // altre → cautela: mana el cas més exigent.
+          msg += (alienes.length === 0 && meves.length)
+            ? 'Reservar les màquines te les garanteix per a la sessió.'
+            : 'Confirma només si ho tens acordat amb el docent titular.';
+        }
+
+        if (senseInfo.length) {
+          if (msg) msg += '\n\n';
+          msg += '⚠️ No s\'ha pogut determinar el taller de: ' + senseInfo.join(', ') +
+                 '.\nNo podem comprovar si hi ha classe en aquesta franja.';
+        }
+
+        return confirm(msg + '\n\nVols continuar amb la reserva?');
+      })
+      .catch(function (err) {
+        // L'horari és un AVÍS, no una guarda: si no es pot llegir, no bloquegem
+        // la reserva — avisem que no s'ha pogut comprovar i que decideixi l'usuari.
+        console.warn('[Reserves] No s\'ha pogut llegir Horari_Tallers:', err);
+        return confirm('No s\'ha pogut comprovar si aquesta franja té classe programada.\n\n' +
+                       'Vols continuar amb la reserva?');
+      });
+  }
+
   // ── Selecció franja nova ───────────────────────────
   // Capa 1: N màquines a la MATEIXA franja (sessió de grup). Caselles de selecció
   // en lloc del desplegable d'una sola màquina: sense infraestructura d'UI al
@@ -239,9 +417,20 @@ window.ModulReserves = (function () {
     btnOk.onclick = function () {
       const sel = _seleccionades();
       if (!sel.length) { _toast('Has de seleccionar almenys una màquina.', 'warning'); return; }
-      _pendingRes.maquines = sel;
-      _hideModal('res-modal');
-      _openChecklist(sel);
+
+      // L'avís de classe va ABANS del checklist, no després: fer marcar tot el
+      // protocol de seguretat i llavors dir que hi ha classe seria absurd.
+      const ini = new Date(iniciStr);
+      const fi  = new Date(fiStr);
+      btnOk.disabled = true;
+      _confirmaClasses(sel, _dataLocal(ini), _horaLocal(ini), _horaLocal(fi))
+        .then(function (endavant) {
+          btnOk.disabled = false;
+          if (!endavant) return;   // L'usuari ha dit que no: es queda al modal.
+          _pendingRes.maquines = sel;
+          _hideModal('res-modal');
+          _openChecklist(sel);
+        });
     };
     _showModal('res-modal');
 
@@ -269,8 +458,11 @@ window.ModulReserves = (function () {
           // Motiu pel qual no es pot triar: primer l'estat de la màquina, després
           // que ja estigui reservada en aquesta franja. El modal INFORMA; qui
           // decideix segueix sent el backend.
+          // CAP CASELLA DESHABILITADA SENSE MOTIU: una màquina grisa i muda no
+          // s'entén. El fallback cobreix Estat_Actual buit, que abans deixava la
+          // casella deshabilitada sense cap text.
           const reservada = Object.prototype.hasOwnProperty.call(ocupades, id);
-          const motiu = !operativa ? est
+          const motiu = !operativa ? (est || 'estat desconegut')
                       : reservada  ? 'reservada' + (ocupades[id] ? ' per ' + ocupades[id] : '') + ' en aquesta franja'
                       : '';
           const bloquejada = !operativa || reservada;
@@ -283,6 +475,7 @@ window.ModulReserves = (function () {
               <span class="small">
                 <strong>${id}</strong>${ubi ? ' <span class="text-muted">· ' + ubi + '</span>' : ''}
                 ${motiu ? '<br><span class="text-muted">' + _esc(motiu) + '</span>' : ''}
+                <span class="text-muted maq-motiu-prot"></span>
               </span>
             </label>`;
         }).join('');
@@ -342,8 +535,14 @@ window.ModulReserves = (function () {
       // franja) i no depèn de la selecció: no es pot recalcular aquí o
       // reactivaríem una màquina que el render havia descartat.
       const bloquejada = cb.dataset.bloquejada === '1';
-      cb.disabled = bloquejada || (protocol !== null && cb.dataset.protocol !== protocol);
+      const perProtocol = !bloquejada && protocol !== null && cb.dataset.protocol !== protocol;
+      cb.disabled = bloquejada || perProtocol;
       cb.closest('label').classList.toggle('opacity-50', cb.disabled);
+
+      // Motiu per màquina també quan la deshabilita el gating de protocol: abans
+      // es tornava grisa i muda i el motiu només sortia a l'avís general de sota.
+      const nota = cb.closest('label').querySelector('.maq-motiu-prot');
+      if (nota) nota.innerHTML = perProtocol ? '<br>un altre protocol de seguretat' : '';
     });
 
     const avis = document.getElementById('maq-avis');
