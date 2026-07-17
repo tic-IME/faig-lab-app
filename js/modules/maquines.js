@@ -1,5 +1,9 @@
 /* ============================================================
    FAIG Lab — Mòdul Màquines
+   ------------------------------------------------------------
+   Copyright (C) 2026  Institut Maria Espinalt
+   Programari lliure sota la GNU GPL v3 o posterior. Veure LICENSE.
+   La marca del centre queda FORA de la llicència. Veure el README.
    ============================================================ */
 
 window.ModulMaquines = (function () {

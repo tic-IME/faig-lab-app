@@ -1,3 +1,15 @@
+/* ============================================================
+   FAIG Lab — Configuració del centre
+   ------------------------------------------------------------
+   Copyright (C) 2026  Institut Maria Espinalt
+   Programari lliure sota la GNU GPL v3 o posterior. Veure LICENSE.
+   La marca del centre queda FORA de la llicència. Veure el README.
+   ------------------------------------------------------------
+   Cap valor d'aquest fitxer és secret: tots són identificadors que el
+   navegador de qualsevol usuari ja veu, o que van impresos en un QR.
+   Si repliqueu l'app, aquest és el fitxer que heu de canviar.
+   ============================================================ */
+
 const FAIG_CONFIG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxfqvG-tQnvNAuNl3W-Ai5SIY0A9dzh9wMtjYAEfclvcQIu3axxMmRjUs8idEuUXbcH/exec',
   GOOGLE_CLIENT_ID: '401812600474-8j16um5i49hu5v1bsjab7trnp7ao2lr8.apps.googleusercontent.com',

@@ -15,6 +15,10 @@
 //
 // Els identificadors del centre estan substituïts per placeholders. Veure
 // el README per saber què hi has de posar per replicar l'app.
+//
+// Copyright (C) 2026  Institut Maria Espinalt
+// Programari lliure sota la GNU GPL v3 o posterior. Veure LICENSE.
+// La marca del centre queda FORA de la llicència. Veure el README.
 // ═══════════════════════════════════════════════════════════════════════
 // === FAIG · Canonada d'encàrrecs ===
 //
