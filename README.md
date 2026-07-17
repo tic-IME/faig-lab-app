@@ -128,17 +128,21 @@ formulari d'incidències hi han de casar una a una.
 |---|---|
 | 1 | `Email_Usuari` |
 | 2 | `Nom_Usuari` |
-| 3 | `Nivell_Permis` |
-| 4 | `Autoritzat_Laser` |
-| 5 | `Autoritzat_3D` |
-
-L'ordre és **obligatori**: `createUsuari` hi escriu per posició.
+| 3 | `Grup_Classe` |
+| 4 | `Nivell_Permis` |
 
 `Nivell_Permis` amb el valor exacte `ADMIN` dona permisos d'administració.
 Qualsevol altre correu del domini del centre entra com a usuari normal.
 
 > **Limitació honesta:** avui `validateToken` només distingeix `ADMIN` de la
 > resta. Els altres valors de `Nivell_Permis` **no es llegeixen**.
+
+> **⚠️ PENDENT DE RECONCILIACIÓ — no repliqueu aquesta pestanya encara.**
+> `createUsuari` escriu **per posició** i espera un ordre que **no és aquest**
+> (hi posaria `Nivell_Permis` dins de `Grup_Classe`). No ha petat mai perquè
+> **cap pantalla de l'app el crida**: no hi ha mòdul d'usuaris. `updateUsuari` i
+> `validateToken` treballen **per nom** i van bé. Veure *Estat de la
+> reconciliació* al final.
 
 #### `Reserves`
 
@@ -214,12 +218,18 @@ checklist val per a un lot de reserves **només si totes les màquines compartei
 
 | # | Capçalera | | # | Capçalera |
 |---|---|---|---|---|
-| 1 | `ID_Material` | | 5 | `Taller` |
-| 2 | `Nom_Material` | | 6 | `Estoc_Actual` |
-| 3 | `Unitat` | | 7 | `Estoc_Minim` |
-| 4 | `Categoria` | | 8 | `Estat_Alerta` |
+| 1 | `ID_Material` | | 7 | `Estoc_Actual` |
+| 2 | `Nom_Material` | | 8 | `Estoc_Minim` |
+| 3 | `Unitat` | | 9 | `Estat_Alerta` |
+| 4 | `Categoria` | | 10 | `Darrera_Act.` |
+| 5 | `Taller` | | 11 | `Imatge` |
+| 6 | `Estoc_Inicial` | | | |
 
-L'ordre és **obligatori**: `createMaterial` hi escriu per posició.
+> **⚠️ PENDENT DE RECONCILIACIÓ — no repliqueu aquesta pestanya encara.**
+> `createMaterial` escriu **per posició** i espera un ordre que **no és aquest**:
+> desplaça una columna a partir de la 6 i deixaria `'OK'` dins d'`Estoc_Minim`.
+> `updateMaterial` i `registreConsum` treballen **per nom** i van bé. Veure
+> *Estat de la reconciliació* al final.
 
 #### `Registre_Consum`
 
@@ -424,6 +434,31 @@ Codi publicat sota la **GNU General Public License v3.0 o posterior**. Veure
 > Maria Espinalt ([`assets/`](assets/)), el nom del centre i la seva imatge
 > gràfica **no** es publiquen sota la GPL i no en podeu fer ús. Si repliqueu
 > l'app, substituïu el logo pel vostre i canvieu `CENTRE` a `config.js`.
+
+## Estat de la reconciliació (17/07/2026)
+
+Dues pestanyes tenen el **codi desalineat amb el full**, i el full és el que mana:
+és el que porta les dades reals del centre.
+
+| | `Usuaris_autoritzats` | `Inventari_materials` |
+|---|---|---|
+| Camí trencat | `createUsuari` | `createMaterial` |
+| S'hi pot arribar des de l'app? | **No** — no hi ha mòdul d'usuaris | **Sí** — botó «Nou material» |
+| Camins que van bé (per nom) | `validateToken`, `updateUsuari` | `updateMaterial`, `registreConsum` |
+
+**Per què no havia petat mai:** els dos camins trencats són els de **creació**, i
+són els únics que escriuen **per posició**. La resta llegeix i escriu **pel nom
+de la capçalera**, que és el patró bo i el que fa la resta de l'app.
+
+Columnes que el codi coneix i el full **no té** — el gating de làser/3D està
+desactivat des de fa temps (`Code.js`) i ningú les llegeix:
+`Autoritzat_Laser`, `Autoritzat_3D`.
+
+Columnes que el full té i el codi **no coneix**, informatives: `Grup_Classe`,
+`Estoc_Inicial`, `Darrera_Act.`, `Imatge`.
+
+**Fins que això es reconciliï, no repliqueu aquestes dues pestanyes.** La resta
+del document és exacta i està verificada contra el full real.
 
 ## Què NO hi ha en aquest repositori
 
