@@ -4,15 +4,43 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FAIG Lab — Institut Maria Espinalt</title>
+  <!-- ORDRE DELS FULLS D'ESTIL: LES LLIBRERIES PRIMER, EL NOSTRE CSS DESPRÉS.
+       NO ÉS COSMÈTIC I NO ES POT REORDENAR. Bootstrap i el nostre components.css
+       defineixen classes amb ELS MATEIXOS NOMS (.card, .modal-backdrop, .modal-header,
+       .modal-title, .modal-body, .badge, .toast) i, a igualtat d'especificitat, guanya
+       l'últim que carrega. Amb Bootstrap al final (com era fins al 20/07/2026) el
+       sistema de disseny propi perdia: les targetes es pintaven BLANQUES en tema fosc,
+       el fons dels modals era negre opac en lloc del 45% translúcid, i el radi era de
+       5.625px (els 0.375rem de Bootstrap) en lloc dels 10px de --radius.
+       Verificat amb getComputedStyle, no a ull. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/components.css" />
+
+  <!-- UN SOL SENYAL DE TEMA PER ALS DOS SISTEMES. NO TREURE.
+       El CSS propi segueix prefers-color-scheme; Bootstrap 5.3 NO l'escolta i només
+       obeeix l'atribut data-bs-theme. Sense aquesta sincronització, Bootstrap es queda
+       en tema CLAR per sempre: els seus components (els modals de reserves) es pintaven
+       BLANCS mentre el text l'hereten del nostre --col-text, que en tema fosc és
+       gairebé blanc. Blanc sobre blanc, el mateix incident del 16/07/2026.
+       Va inline i al <head> a posta: si s'executés al final, la pàgina parpellejaria
+       amb el tema equivocat abans de corregir-se. -->
+  <script>
+    (function sincronitzaTemaBootstrap() {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      function aplica() {
+        document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
+      }
+      aplica();
+      mq.addEventListener('change', aplica);
+    })();
+  </script>
+
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-<!-- FullCalendar -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
 
@@ -21,6 +49,7 @@
     <div class="login-card">
       <div class="login-logo">
         <span class="logo-icon">⚙</span>
+        <img class="logo-img" alt="" hidden />
         <h1 class="logo-text">FAIG Lab</h1>
       </div>
       <p class="login-centre">Institut Maria Espinalt</p>
@@ -48,6 +77,7 @@
     <aside id="sidebar">
       <div class="sidebar-logo">
         <span class="logo-icon">⚙</span>
+        <img class="logo-img" alt="" hidden />
         <span class="logo-text">FAIG Lab</span>
       </div>
 
@@ -87,7 +117,12 @@
           <span id="user-name" class="user-name"></span>
           <span id="user-role" class="user-role badge"></span>
         </div>
-        <button class="btn-logout" onclick="Auth.logout()">Sortir</button>
+        <!-- L'etiqueta s'amaga a la barra col·lapsada de mòbil, però el botó NO:
+             abans quedava display:none i des del mòbil no es podia tancar la sessió. -->
+        <button class="btn-logout" onclick="Auth.logout()" title="Sortir" aria-label="Sortir">
+          <span class="logout-icon" aria-hidden="true">⏻</span>
+          <span class="logout-label">Sortir</span>
+        </button>
       </div>
     </aside>
 
@@ -124,6 +159,28 @@
       inventari:   window.ModulInventari,
       dashboard:   window.ModulDashboard,
     };
+
+    // ── Logo del centre ────────────────────────────────────
+    // La imatge substitueix l'emoji NOMÉS si carrega de debò. Sense LOGO_URL a
+    // config.js, o amb un fitxer que no hi és, es queda l'emoji ⚙: un centre que
+    // repliqui l'app no ha de veure mai una imatge trencada. Per això l'<img>
+    // neix amb l'atribut hidden i només se'l treu l'esdeveniment load.
+    (function aplicaLogo() {
+      const url = (window.FAIG_CONFIG && FAIG_CONFIG.LOGO_URL) || '';
+      if (!url) return;
+      document.querySelectorAll('.logo-img').forEach(function(img) {
+        img.addEventListener('load', function() {
+          img.hidden = false;
+          const icona = img.parentElement.querySelector('.logo-icon');
+          if (icona) icona.style.display = 'none';
+        });
+        img.addEventListener('error', function() {
+          img.hidden = true;   // es queda l'emoji
+        });
+        img.alt = FAIG_CONFIG.CENTRE || '';
+        img.src = url;
+      });
+    })();
 
     function loadModule(name) {
       const content = document.getElementById('app-content');

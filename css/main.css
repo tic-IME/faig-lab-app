@@ -6,15 +6,21 @@
 /* ── Variables ─────────────────────────────────────────────── */
 
 :root {
+  /* Els controls natius (els <select> dels filtres) segueixen el tema del sistema.
+     Sense això es pintaven sempre clars, també sobre el tema fosc. */
+  color-scheme: light dark;
+
   --sidebar-w:      220px;
   --col-brand:      #1a56a0;
-  --col-brand-dark: #1344820;
+  --col-brand-dark: #134482;
   --col-brand-light:#e8f0fb;
   --col-bg:         #f4f6fa;
   --col-surface:    #ffffff;
   --col-border:     #dde3ed;
   --col-text:       #1a1d23;
-  --col-text-muted: #6b7280;
+  /* AA: 4.90:1 sobre --col-bg i 5.30:1 sobre --col-surface. Era #6b7280, que sobre
+     --col-bg donava 4.47:1 i es quedava just per sota de l'AA de 4.50. */
+  --col-text-muted: #646c79;
   --col-error:      #dc2626;
   --col-success:    #16a34a;
   --col-warning:    #d97706;
@@ -107,6 +113,27 @@ button {
   line-height: 1;
 }
 
+/* ── Logo del centre ───────────────────────────────────────────
+   La imatge NOMÉS es mostra si carrega de debò (index.html li posa el src
+   des de FAIG_CONFIG.LOGO_URL i només llavors amaga l'emoji). Un centre que
+   repliqui l'app sense logo veu l'emoji ⚙, mai una imatge trencada. */
+
+.logo-img {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.sidebar-logo .logo-img {
+  height: 30px;
+  max-width: 120px;
+}
+
+.login-logo .logo-img {
+  height: 48px;
+  max-width: 220px;
+}
+
 .login-logo .logo-text {
   font-size: 1.7rem;
   font-weight: 700;
@@ -160,6 +187,16 @@ button {
   border-radius: 6px;
   padding: .5rem .875rem;
   width: 100%;
+}
+
+/* La targeta de login és --col-surface, que en tema fosc és fosca: sense això
+   l'avís d'error quedava com un rectangle rosa clar enmig d'una targeta fosca. */
+@media (prefers-color-scheme: dark) {
+  .login-error {
+    color: #f87171;
+    background: #2d0a0a;
+    border-color: #5c1a1a;
+  }
 }
 
 /* ── Layout principal ──────────────────────────────────────── */
@@ -319,6 +356,12 @@ button {
   transition: background var(--transition), color var(--transition);
 }
 
+/* La icona només surt a la barra col·lapsada, on l'etiqueta no hi cap: a
+   l'escriptori el botó es queda exactament com era, amb el text sol. */
+.logout-icon {
+  display: none;
+}
+
 .btn-logout:hover {
   background: rgba(255,255,255,.1);
   color: #ffffff;
@@ -387,17 +430,45 @@ button {
     --sidebar-w: 60px;
   }
 
+  /* El botó de sortir ja NO s'amaga: abans era display:none i des del mòbil no hi
+     havia cap manera de tancar la sessió, amb un peu de barra buit i vorejat.
+     Ara es queda com a icona. */
   .nav-label,
   .logo-text,
-  .sidebar-footer .user-name,
-  .sidebar-footer .badge,
-  .btn-logout {
+  .logout-label,
+  .sidebar-user {
     display: none;
   }
 
   .nav-item {
     justify-content: center;
     padding: .65rem;
+  }
+
+  .sidebar-logo {
+    justify-content: center;
+    padding: 1rem .25rem;
+  }
+
+  .sidebar-logo .logo-img {
+    height: 26px;
+    max-width: 40px;
+  }
+
+  .sidebar-footer {
+    padding: .75rem .5rem;
+  }
+
+  .btn-logout {
+    padding: .5rem 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .logout-icon {
+    display: inline-block;   /* sense això la regla de base (display:none) mana i el botó queda BUIT */
+    font-size: 1.05rem;
+    line-height: 1;
   }
 
   #app-content {

@@ -4,6 +4,11 @@ const FAIG_CONFIG = {
   OAUTH_SCOPE: 'openid email profile',
   APP_NAME: 'FAIG Lab',
   CENTRE: 'Institut Maria Espinalt',
+  // Logo del centre, a la barra lateral i a la pantalla d'entrada. Si el fitxer no
+  // hi és, l'app es queda amb l'emoji ⚙ i NO es trenca: un centre que repliqui
+  // l'app només ha de substituir aquest PNG (o buidar aquest valor).
+  // LA MARCA DEL CENTRE NO ENTRA A LA GPL: veure el README.
+  LOGO_URL: 'assets/logo.png',
   NIVELLS: {
     ADMIN: 'ADMIN',
     USUARI: 'USUARI',

@@ -255,6 +255,14 @@ tbody tr:hover td {
   margin-top: .2rem;
 }
 
+/* Al taller l'app es fa servir des del mòbil: dues columnes de formulari en una
+   pantalla estreta deixen els camps de data i hora inservibles. */
+@media (max-width: 700px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Badges d'estat màquina ────────────────────────────────── */
 
 .estat-badge {
