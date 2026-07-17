@@ -73,6 +73,17 @@ Els identificadors del centre hi són substituïts per **placeholders**. Cerqueu
 > accent, un espai de més, un apòstrof tipogràfic (`'`) en lloc del recte (`'`),
 > una majúscula: qualsevol diferència i **la columna deixa d'existir per al codi**.
 >
+> **L'ESPAI FINAL ÉS EL PITJOR DE TOTS PERQUÈ NO ES VEU.** A nosaltres, tres
+> capçaleres de l'inventari van viure setmanes amb un espai al final: la vista
+> mostrava `0` a l'estoc de tots els materials, no saltava cap alerta d'estoc
+> baix, registrar un consum petava, i editar un material **desava el nom i
+> descartava l'estoc sense dir res**. Cap error, cap avís.
+>
+> **Comproveu-ho amb una fórmula, no a ull.** En una cel·la buida:
+> `=TEXTJOIN(" ";FALSE;ARRAYFORMULA(LEN(A1:K1)))`
+> i compareu les longituds amb les dels noms d'aquest document. Qualsevol
+> diferència és un caràcter invisible.
+>
 > Segons el camí, això peta amb un error clar **o falla en silenci**. Els camins
 > que escriuen amb `appendRow` ho fan **per POSICIÓ**: si canvieu l'ordre de les
 > columnes, l'app escriurà a la columna equivocada **sense dir res**.
@@ -134,15 +145,10 @@ formulari d'incidències hi han de casar una a una.
 `Nivell_Permis` amb el valor exacte `ADMIN` dona permisos d'administració.
 Qualsevol altre correu del domini del centre entra com a usuari normal.
 
+`Grup_Classe` és informativa: cap codi la llegeix.
+
 > **Limitació honesta:** avui `validateToken` només distingeix `ADMIN` de la
 > resta. Els altres valors de `Nivell_Permis` **no es llegeixen**.
-
-> **⚠️ PENDENT DE RECONCILIACIÓ — no repliqueu aquesta pestanya encara.**
-> `createUsuari` escriu **per posició** i espera un ordre que **no és aquest**
-> (hi posaria `Nivell_Permis` dins de `Grup_Classe`). No ha petat mai perquè
-> **cap pantalla de l'app el crida**: no hi ha mòdul d'usuaris. `updateUsuari` i
-> `validateToken` treballen **per nom** i van bé. Veure *Estat de la
-> reconciliació* al final.
 
 #### `Reserves`
 
@@ -225,11 +231,12 @@ checklist val per a un lot de reserves **només si totes les màquines compartei
 | 5 | `Taller` | | 11 | `Imatge` |
 | 6 | `Estoc_Inicial` | | | |
 
-> **⚠️ PENDENT DE RECONCILIACIÓ — no repliqueu aquesta pestanya encara.**
-> `createMaterial` escriu **per posició** i espera un ordre que **no és aquest**:
-> desplaça una columna a partir de la 6 i deixaria `'OK'` dins d'`Estoc_Minim`.
-> `updateMaterial` i `registreConsum` treballen **per nom** i van bé. Veure
-> *Estat de la reconciliació* al final.
+`Estoc_Inicial` l'omple el codi en crear el material (amb l'estoc del moment) i no
+el torna a tocar mai. `Darrera_Act.` i `Imatge` són informatives: cap codi les
+llegeix ni les escriu.
+
+> L'ordre d'aquesta taula **no és crític**: des de la versió @58 tot el codi que
+> hi escriu ho fa **pel nom de la capçalera**. Els noms, en canvi, sí que ho són.
 
 #### `Registre_Consum`
 
@@ -435,30 +442,23 @@ Codi publicat sota la **GNU General Public License v3.0 o posterior**. Veure
 > gràfica **no** es publiquen sota la GPL i no en podeu fer ús. Si repliqueu
 > l'app, substituïu el logo pel vostre i canvieu `CENTRE` a `config.js`.
 
-## Estat de la reconciliació (17/07/2026)
+## Escriure al full: per nom, mai per posició
 
-Dues pestanyes tenen el **codi desalineat amb el full**, i el full és el que mana:
-és el que porta les dades reals del centre.
+Tot el codi que escriu al full ho fa **pel nom de la capçalera** (`_colsPerNom`),
+i **peta amb la llista de les que falten** si no les troba. Les úniques excepcions
+són dues pestanyes de registre que el codi només omple i que mai no llegeix
+(`Registre_Consum`, `Registre_Checklists`).
 
-| | `Usuaris_autoritzats` | `Inventari_materials` |
-|---|---|---|
-| Camí trencat | `createUsuari` | `createMaterial` |
-| S'hi pot arribar des de l'app? | **No** — no hi ha mòdul d'usuaris | **Sí** — botó «Nou material» |
-| Camins que van bé (per nom) | `validateToken`, `updateUsuari` | `updateMaterial`, `registreConsum` |
+Això no era així fins al 17/07/2026, i val la pena explicar per què va durar tant:
+`createMaterial` i `createUsuari` escrivien **per posició** contra un ordre de
+columnes que el full **no tenia**. No havia petat mai perquè **ningú els havia
+executat**: `createUsuari` no el crida cap pantalla, i el botó «Nou material» no
+s'havia premut. Un camí d'escriptura per posició que no s'exercita **no dona cap
+senyal fins al dia que algú el prem**.
 
-**Per què no havia petat mai:** els dos camins trencats són els de **creació**, i
-són els únics que escriuen **per posició**. La resta llegeix i escriu **pel nom
-de la capçalera**, que és el patró bo i el que fa la resta de l'app.
-
-Columnes que el codi coneix i el full **no té** — el gating de làser/3D està
-desactivat des de fa temps (`Code.js`) i ningú les llegeix:
-`Autoritzat_Laser`, `Autoritzat_3D`.
-
-Columnes que el full té i el codi **no coneix**, informatives: `Grup_Classe`,
-`Estoc_Inicial`, `Darrera_Act.`, `Imatge`.
-
-**Fins que això es reconciliï, no repliqueu aquestes dues pestanyes.** La resta
-del document és exacta i està verificada contra el full real.
+Si repliqueu l'app i hi afegiu codi: **escriviu per nom, i feu que peti si el nom
+no hi és.** Un `if (col > 0) { … }` que se salta el que no troba és pitjor que un
+error: desa la meitat dels camps i no diu res.
 
 ## Què NO hi ha en aquest repositori
 

@@ -2,7 +2,7 @@
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
 // Generada:  2026-07-17
-// Versió del web app desplegada en aquell moment:  @57
+// Versió del web app desplegada en aquell moment:  @58
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i
@@ -956,19 +956,25 @@ function registreConsum(body, usuari) {
 function updateMaterial(body, usuari) {
   if (usuari.nivell !== 'ADMIN') return errorResponse('Sense permisos', 403);
 
-  var sheet   = getSheet('Inventari_materials');
-  var data    = sheetToObjects(sheet);
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var sheet = getSheet('Inventari_materials');
+  var data  = sheetToObjects(sheet);
+
+  // El `if (col > 0)` d'abans es SALTAVA EN SILENCI els camps que no trobava: amb
+  // l'espai final a la capçalera, editar un material desava el nom i descartava
+  // l'estoc sense dir res. Ara peta i es veu.
+  var cols;
+  try {
+    cols = _colsPerNom(sheet, ['Nom_Material', 'Unitat', 'Categoria', 'Taller',
+                               'Estoc_Actual', 'Estoc_Minim', 'Estat_Alerta']);
+  } catch (err) {
+    return errorResponse(err.message, 500);
+  }
 
   for (var i = 0; i < data.length; i++) {
     if (data[i]['ID_Material'] === body.material_id) {
       var rowIdx = i + 2;
-      var camps  = ['Nom_Material', 'Unitat', 'Categoria', 'Taller', 'Estoc_Actual', 'Estoc_Minim', 'Estat_Alerta'];
-      camps.forEach(function(camp) {
-        if (body[camp] !== undefined) {
-          var col = headers.indexOf(camp) + 1;
-          if (col > 0) sheet.getRange(rowIdx, col).setValue(body[camp]);
-        }
+      Object.keys(cols).forEach(function(camp) {
+        if (body[camp] !== undefined) sheet.getRange(rowIdx, cols[camp]).setValue(body[camp]);
       });
       return jsonResponse({ updated: true });
     }
@@ -976,21 +982,92 @@ function updateMaterial(body, usuari) {
   return errorResponse('Material no trobat', 404);
 }
 
+// Localitza columnes pel NOM de capçalera i LLANÇA si en falta cap, amb la llista.
+// Generalització d'_incidenciaColumnes/_encarrecColumnes, que ja fan això i són en
+// producció.
+//
+// NO FA trim() DE LES CAPÇALERES, I ÉS DELIBERAT (17/07/2026). Un espai final a la
+// capçalera ha de petar aquí i sortir del FULL, no quedar-s'hi tapat pel codi. Veure
+// la nota del CLAUDE.md: un trim NOMÉS a sheetToObjects deixaria la meitat de l'app
+// funcionant (les lectures) i l'altra meitat petant (els indexOf directes), que és la
+// pitjor de les combinacions per diagnosticar.
+function _colsPerNom(sheet, noms) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var cols   = {};
+  var falten = [];
+  noms.forEach(function (n) {
+    var i = headers.indexOf(n);
+    if (i === -1) falten.push(n); else cols[n] = i + 1;
+  });
+  if (falten.length > 0) {
+    throw new Error('Capçaleres no trobades a "' + sheet.getName() + '": ' + falten.join(', ') +
+                    '. Han de coincidir EXACTAMENT: accents, majúscules i espais al final inclosos.');
+  }
+  return cols;
+}
+
+// Escriu una fila NOVA col·locant cada valor per NOM de capçalera. Substitueix el
+// patró appendRow-per-posició, que escrivia a la columna equivocada en silenci quan
+// l'ordre del full no era el que el codi es pensava.
+function _escriuFilaPerNom(sheet, valors) {
+  var cols = _colsPerNom(sheet, Object.keys(valors));
+  var fila = sheet.getLastRow() + 1;
+  Object.keys(valors).forEach(function (n) {
+    sheet.getRange(fila, cols[n]).setValue(valors[n]);
+  });
+  SpreadsheetApp.flush();
+  return fila;
+}
+
+// L'ID el posa l'usuari al formulari (#nou-id): NO se'l pot inventar el backend.
+// La unicitat es comprova AQUÍ i no només al frontend: la del frontend és comoditat,
+// no garantia.
 function createMaterial(body, usuari) {
   if (usuari.nivell !== 'ADMIN') return errorResponse('Sense permisos', 403);
 
-  var sheet = getSheet('Inventari_materials');
-  appendRow(sheet, [
-    'MAT-' + new Date().getTime(),
-    body['Nom_Material']  || '',
-    body['Unitat']        || '',
-    body['Categoria']     || '',
-    body['Taller']        || '',
-    body['Estoc_Actual']  || 0,
-    body['Estoc_Minim']   || 0,
-    body['Estat_Alerta']  || 'OK',
-  ]);
-  return jsonResponse({ created: true });
+  var id = String(body['ID_Material'] || '').trim();
+  if (!id) return errorResponse('Falta ID_Material', 400);
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (err) {
+    return errorResponse('El sistema està ocupat, torna-ho a provar en uns segons.', 503);
+  }
+
+  try {
+    var sheet = getSheet('Inventari_materials');
+
+    var existents = sheetToObjects(sheet);
+    for (var i = 0; i < existents.length; i++) {
+      if (String(existents[i]['ID_Material'] || '').trim() === id) {
+        return errorResponse('Ja existeix un material amb l\'ID "' + id + '"', 409);
+      }
+    }
+
+    // Estoc_Inicial = l'estoc del moment de crear-lo, que és el que vol dir el nom.
+    // El formulari no el demana i no té sentit que ho faci.
+    var estoc = body['Estoc_Actual'] || 0;
+
+    _escriuFilaPerNom(sheet, {
+      'ID_Material':   id,
+      'Nom_Material':  body['Nom_Material'] || '',
+      'Unitat':        body['Unitat']       || '',
+      'Categoria':     body['Categoria']    || '',
+      'Taller':        body['Taller']       || '',
+      'Estoc_Inicial': estoc,
+      'Estoc_Actual':  estoc,
+      'Estoc_Minim':   body['Estoc_Minim']  || 0,
+      'Estat_Alerta':  body['Estat_Alerta'] || 'OK',
+    });
+    // Darrera_Act. i Imatge no es toquen: són del centre, no del codi.
+
+    return jsonResponse({ created: true, ID_Material: id });
+  } catch (err) {
+    return errorResponse(err.message, 500);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getUsuaris(usuari) {
@@ -999,35 +1076,68 @@ function getUsuaris(usuari) {
   return jsonResponse(data);
 }
 
+// Autoritzat_Laser i Autoritzat_3D han MARXAT (17/07/2026): el full no les té, ningú
+// no les llegeix i el gating de làser/3D consta desactivat des de fa temps (veure la
+// nota sobre createReserva). Escrivint per posició, aquell 'NO' d'Autoritzat_Laser
+// requeia sobre Nivell_Permis i deixava l'usuari nou sense nivell.
 function createUsuari(body, usuari) {
   if (usuari.nivell !== 'ADMIN') return errorResponse('Sense permisos', 403);
-  var sheet = getSheet('Usuaris_autoritzats');
-  appendRow(sheet, [
-    body['Email_Usuari']     || '',
-    body['Nom_Usuari']       || '',
-    body['Nivell_Permis']    || 'USUARI',
-    body['Autoritzat_Laser'] || 'NO',
-    body['Autoritzat_3D']    || 'NO',
-  ]);
-  return jsonResponse({ created: true });
+
+  var email = String(body['Email_Usuari'] || '').trim();
+  if (!email) return errorResponse('Falta Email_Usuari', 400);
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (err) {
+    return errorResponse('El sistema està ocupat, torna-ho a provar en uns segons.', 503);
+  }
+
+  try {
+    var sheet = getSheet('Usuaris_autoritzats');
+
+    var existents = sheetToObjects(sheet);
+    for (var i = 0; i < existents.length; i++) {
+      if (String(existents[i]['Email_Usuari'] || '').trim().toLowerCase() === email.toLowerCase()) {
+        return errorResponse('Ja existeix un usuari amb el correu "' + email + '"', 409);
+      }
+    }
+
+    _escriuFilaPerNom(sheet, {
+      'Email_Usuari':  email,
+      'Nom_Usuari':    body['Nom_Usuari']    || '',
+      'Grup_Classe':   body['Grup_Classe']   || '',
+      'Nivell_Permis': body['Nivell_Permis'] || 'USUARI',
+    });
+
+    return jsonResponse({ created: true, Email_Usuari: email });
+  } catch (err) {
+    return errorResponse(err.message, 500);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function updateUsuari(body, usuari) {
   if (usuari.nivell !== 'ADMIN') return errorResponse('Sense permisos', 403);
 
-  var sheet   = getSheet('Usuaris_autoritzats');
-  var data    = sheetToObjects(sheet);
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var sheet = getSheet('Usuaris_autoritzats');
+  var data  = sheetToObjects(sheet);
+
+  // Mateixa correcció que a updateMaterial: fora el salt silenciós.
+  // Autoritzat_Laser/Autoritzat_3D fora: el full no les té i ningú no les llegeix.
+  var cols;
+  try {
+    cols = _colsPerNom(sheet, ['Nom_Usuari', 'Grup_Classe', 'Nivell_Permis']);
+  } catch (err) {
+    return errorResponse(err.message, 500);
+  }
 
   for (var i = 0; i < data.length; i++) {
     if (data[i]['Email_Usuari'] === body['Email_Usuari']) {
       var rowIdx = i + 2;
-      var camps  = ['Nom_Usuari', 'Nivell_Permis', 'Autoritzat_Laser', 'Autoritzat_3D'];
-      camps.forEach(function(camp) {
-        if (body[camp] !== undefined) {
-          var col = headers.indexOf(camp) + 1;
-          if (col > 0) sheet.getRange(rowIdx, col).setValue(body[camp]);
-        }
+      Object.keys(cols).forEach(function(camp) {
+        if (body[camp] !== undefined) sheet.getRange(rowIdx, cols[camp]).setValue(body[camp]);
       });
       return jsonResponse({ updated: true });
     }
