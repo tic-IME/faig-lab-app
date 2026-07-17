@@ -1,15 +1,19 @@
 # assets
 
-## logo.png — logo del centre
+## Logo del centre
+
+Fitxer actual: **`logo_lluerna_verd.png`** — la lluerna de l'Institut Maria
+Espinalt.
 
 L'app el mostra a la barra lateral i a la pantalla d'entrada, i el llegeix de
-`LOGO_URL` a `config.js` (arrel del repositori).
+`LOGO_URL` a `config.js` (arrel del repositori). **El nom del fitxer és
+indiferent**: manda el que digui `LOGO_URL`.
 
-**Si aquest fitxer no hi és, l'app NO es trenca**: es queda amb l'emoji ⚙ de
-sempre. La imatge només substitueix l'emoji si carrega de debò.
+**Si el fitxer no hi és, l'app NO es trenca**: es queda amb l'emoji ⚙ de sempre.
+La imatge només substitueix l'emoji si carrega de debò.
 
-Per a un centre que repliqui l'app: substituïu aquest fitxer pel vostre logo, o
-buideu `LOGO_URL` a `config.js` per quedar-vos amb l'emoji.
+Per a un centre que repliqui l'app: deixeu el vostre logo en aquesta carpeta i
+apunteu-hi `LOGO_URL`, o buideu `LOGO_URL` per quedar-vos amb l'emoji.
 
 ### Especificacions del fitxer
 

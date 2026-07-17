@@ -166,7 +166,12 @@
     // repliqui l'app no ha de veure mai una imatge trencada. Per això l'<img>
     // neix amb l'atribut hidden i només se'l treu l'esdeveniment load.
     (function aplicaLogo() {
-      const url = (window.FAIG_CONFIG && FAIG_CONFIG.LOGO_URL) || '';
+      // OJO amb el guard: config.js fa `const FAIG_CONFIG = {...}` al nivell superior
+      // d'un script clàssic, i això crea un BINDING LÈXIC global, NO una propietat de
+      // window. `window.FAIG_CONFIG` és undefined encara que `FAIG_CONFIG` existeixi:
+      // amb aquell guard la funció sortia sempre i el logo no s'aplicava MAI, amagat
+      // per l'emoji de fallback. Cal `typeof`.
+      const url = (typeof FAIG_CONFIG !== 'undefined' && FAIG_CONFIG.LOGO_URL) || '';
       if (!url) return;
       document.querySelectorAll('.logo-img').forEach(function(img) {
         img.addEventListener('load', function() {
@@ -177,7 +182,7 @@
         img.addEventListener('error', function() {
           img.hidden = true;   // es queda l'emoji
         });
-        img.alt = FAIG_CONFIG.CENTRE || '';
+        img.alt = (typeof FAIG_CONFIG !== 'undefined' && FAIG_CONFIG.CENTRE) || '';
         img.src = url;
       });
     })();

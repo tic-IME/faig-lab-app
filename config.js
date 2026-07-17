@@ -8,7 +8,7 @@ const FAIG_CONFIG = {
   // hi és, l'app es queda amb l'emoji ⚙ i NO es trenca: un centre que repliqui
   // l'app només ha de substituir aquest PNG (o buidar aquest valor).
   // LA MARCA DEL CENTRE NO ENTRA A LA GPL: veure el README.
-  LOGO_URL: 'assets/logo.png',
+  LOGO_URL: 'assets/logo_lluerna_verd.png',
   NIVELLS: {
     ADMIN: 'ADMIN',
     USUARI: 'USUARI',
