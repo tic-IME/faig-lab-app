@@ -1,0 +1,30 @@
+# Xarxa de seguretat contra identificadors del centre publicats sense voler.
+#
+# QUÈ ÉS I QUÈ NO ÉS: quan això s'executa, el codi JA és a GitHub i JA és públic.
+# Un identificador de Drive no es pot rotar com una clau d'API. Per tant això és
+# un DETECTOR, no una barrera: serveix per assabentar-se'n el mateix dia.
+# La barrera de debò són .gitignore (backend/ i .clasp.json no poden entrar a un
+# commit) i tools/publica-backend.js (no escriu la instantània si hi detecta res).
+#
+# Per què no hi ha cap secret en aquest fitxer ni al script: el check treballa per
+# FORMA (identificadors de Google i correus), amb una llista dels que SÍ que han
+# de ser al repositori perquè són públics a posta.
+
+name: Identificadors
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  comprova:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # El mateix script que es pot executar en local:
+      #   node tools/comprova-secrets.js
+      - run: node tools/comprova-secrets.js
