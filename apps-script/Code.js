@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
-// Generada:  2026-07-17
-// Versió del web app desplegada en aquell moment:  @58
+// Generada:  2026-07-18
+// Versió del web app desplegada en aquell moment:  @59
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i
@@ -176,7 +176,21 @@ function validateToken(accessToken) {
       }
     }
 
-    if (email.endsWith('@el-teu-domini.cat')) {
+    // El domini ja NO és al codi: viu a Script Property DOMINI_CENTRE (@59).
+    // FAIL-CLOSED: si la propietat falta, es denega tot USUARI. Denegar és millor que
+    // deixar entrar qualsevol domini. Els ADMIN no en depenen (es validen pel full, a
+    // sobre), o sigui que un oblit d'aquesta propietat bloqueja el professorat però
+    // NO tanca l'administració fora del sistema.
+    // REGLA DE DESPLEGAMENT: la propietat s'ha de crear ABANS del deploy que activi
+    // aquest codi, o tot l'USUARI queda fora fins que es creï.
+    var dominiCentre = PropertiesService.getScriptProperties().getProperty('DOMINI_CENTRE');
+    if (!dominiCentre) {
+      Logger.log('validateToken: FALTA DOMINI_CENTRE. Es denega tot USUARI (fail-closed).');
+      return null;
+    }
+    // Tolera que la propietat porti l'@ al davant o no.
+    var domini = dominiCentre.trim().replace(/^@/, '');
+    if (email.endsWith('@' + domini)) {
       var nom = email.split('@')[0];
       return {
         email:    info.email,

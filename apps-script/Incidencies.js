@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
-// Generada:  2026-07-17
-// Versió del web app desplegada en aquell moment:  @58
+// Generada:  2026-07-18
+// Versió del web app desplegada en aquell moment:  @59
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i
@@ -512,14 +512,23 @@ function provaAlertaEncallades() {
 // Executar UNA VEGADA des de l'editor web. Crea l'activador onFormSubmit
 // del formulari "Registre d'Incidències – FAIG Lab" apuntant a processarIncidencia.
 function crearTriggerIncidencies() {
-  var FORM_ID = 'POSA-HI-EL-FORM-ID-D-INCIDENCIES';
+  // El Form ID ja NO és al codi: viu a Script Property FORM_INCIDENCIES_ID (@59),
+  // com FORM_ENCARRECS_ID. Si falta, no creem res i ho diem.
+  var FORM_ID = PropertiesService.getScriptProperties().getProperty('FORM_INCIDENCIES_ID');
+  if (!FORM_ID) {
+    Logger.log('FALTA la Script Property FORM_INCIDENCIES_ID. No es crea cap trigger.');
+    return;
+  }
 
-  // Evitem duplicats: si ja existeix un trigger de processarIncidencia, no en creem un altre
+  // Evitem duplicats: si ja existeix un trigger de processarIncidencia, no en creem un altre.
+  // ATENCIÓ AL CUTOVER: aquesta guarda bloqueja la creació si el trigger VELL encara hi és.
+  // Cal esborrar-lo ABANS d'executar aquesta funció perquè apunti al formulari nou.
   var jaExisteix = ScriptApp.getProjectTriggers().some(function (t) {
     return t.getHandlerFunction() === 'processarIncidencia';
   });
   if (jaExisteix) {
-    Logger.log('El trigger ja existeix. No se n\'ha creat cap de nou.');
+    Logger.log('El trigger ja existeix. No se n\'ha creat cap de nou. (Si estàs migrant, ' +
+               'esborra primer el trigger vell.)');
     return;
   }
 
@@ -528,5 +537,5 @@ function crearTriggerIncidencies() {
     .onFormSubmit()
     .create();
 
-  Logger.log('Trigger creat: processarIncidencia s\'executarà en enviar el formulari.');
+  Logger.log('Trigger creat: processarIncidencia sobre el formulari ' + FORM_ID + '.');
 }
