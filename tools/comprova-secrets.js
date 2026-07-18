@@ -43,8 +43,9 @@ const PUBLICS = [
   'AKfycbxfqvG-tQnvNAuNl3W-Ai5SIY0A9dzh9wMtjYAEfclvcQIu3axxMmRjUs8idEuUXbcH',
   // Client ID d'OAuth — pensat per anar al frontend
   '401812600474-8j16um5i49hu5v1bsjab7trnp7ao2lr8',
-  // URL de RESPOSTA del formulari d'incidències (QR a la paret)
-  '1FAIpQLSepRkglU9XDUAO5pefruvbvxSkV4RyJxP_GrZ69_qQjQmAAlg',
+  // URL de RESPOSTA del formulari d'incidències (QR a la paret). Actualitzat a la
+  // còpia de tic@ el 18/07/2026; el vell (1FAIpQLSepRkglU9...) ja no és a cap fitxer.
+  '1FAIpQLSecbKYBsSoSCGay2DSxSHNbGxX-1IXxX8z5sG8muoXTpzz2eQ',
   // URL de RESPOSTA del formulari d'encàrrecs (QR a la paret)
   '1FAIpQLSfLdQD6-Lh6aHJ_Si0z1iUiYSjSjGEv7z2Jhdnd8iU-3B_GTQ',
 ];

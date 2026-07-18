@@ -42,7 +42,7 @@ const FAIG_CONFIG = {
     CANCELADA: 'cancel·lada',
   },
   // Formulari públic d'incidències del centre (via única d'entrada; motor de regles al backend)
-  FORM_INCIDENCIES_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSepRkglU9XDUAO5pefruvbvxSkV4RyJxP_GrZ69_qQjQmAAlg/viewform',
+  FORM_INCIDENCIES_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSecbKYBsSoSCGay2DSxSHNbGxX-1IXxX8z5sG8muoXTpzz2eQ/viewform',
   // Entry ID de la pregunta de màquina del formulari: permet preseleccionar-la amb usp=pp_url
   FORM_INCIDENCIES_ENTRY_MAQUINA: 'entry.1463811996',
   // Formulari públic d'encàrrecs als espais maker (via única d'entrada, igual que incidències).
