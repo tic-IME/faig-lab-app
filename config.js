@@ -6,7 +6,8 @@
    La marca del centre queda FORA de la llicència. Veure el README.
    ------------------------------------------------------------
    Cap valor d'aquest fitxer és secret: tots són identificadors que el
-   navegador de qualsevol usuari ja veu, o que van impresos en un QR.
+   navegador de qualsevol usuari ja veu (URL del web app, Client ID d'OAuth,
+   enllaços de resposta de formularis públics).
    Si repliqueu l'app, aquest és el fitxer que heu de canviar.
    ============================================================ */
 
@@ -46,8 +47,8 @@ const FAIG_CONFIG = {
   // Entry ID de la pregunta de màquina del formulari: permet preseleccionar-la amb usp=pp_url
   FORM_INCIDENCIES_ENTRY_MAQUINA: 'entry.1463811996',
   // Formulari públic d'encàrrecs als espais maker (via única d'entrada, igual que incidències).
-  // Viu aquí i no a Script Properties perquè NO és cap secret (el mateix URL va imprès en un QR
-  // a la paret) i perquè un botó que depengués d'una crida al backend tindria un mode de fallada
+  // Viu aquí i no a Script Properties perquè NO és cap secret (és un enllaç de resposta d'un
+  // formulari públic) i perquè un botó que depengués d'una crida al backend tindria un mode de fallada
   // a canvi de res. La neteja de la FASE 4 va del BACKEND (Form ID d'edició, Script ID), no
   // d'aquesta config pública. Sense preemplenat: l'encàrrec no va lligat a cap màquina.
   FORM_ENCARRECS_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSfLdQD6-Lh6aHJ_Si0z1iUiYSjSjGEv7z2Jhdnd8iU-3B_GTQ/viewform',

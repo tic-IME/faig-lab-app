@@ -406,8 +406,9 @@ targeta. El traieu del menú ⋮ del formulari → *Emplena prèviament el formu
 > Si algú canvia aquella pregunta, **l'entry ID canvia i el preemplenat deixa de
 > funcionar en silenci**.
 
-Res de tot això és secret: són valors que el navegador de qualsevol usuari ja veu,
-o que van impresos en un QR penjat a la paret.
+Res de tot això és secret: són valors que el navegador de qualsevol usuari ja veu.
+Els URLs de formulari són enllaços de resposta de formularis públics; no donen cap
+accés més enllà de poder enviar el formulari.
 
 ---
 

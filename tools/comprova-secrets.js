@@ -36,17 +36,17 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 
 // ── Públics per disseny ──────────────────────────────────────────────────────
-// Tots són identificadors que el navegador de qualsevol usuari ja veu, o que van
-// impresos en un QR penjat a la paret. No són secrets i han de ser al repositori.
+// Tots són identificadors que el navegador de qualsevol usuari ja veu. No són
+// secrets i han de ser al repositori.
 const PUBLICS = [
   // GAS_URL — l'URL del web app desplegat, que l'app crida des del navegador
   'AKfycbxfqvG-tQnvNAuNl3W-Ai5SIY0A9dzh9wMtjYAEfclvcQIu3axxMmRjUs8idEuUXbcH',
   // Client ID d'OAuth — pensat per anar al frontend
   '401812600474-8j16um5i49hu5v1bsjab7trnp7ao2lr8',
-  // URL de RESPOSTA del formulari d'incidències (QR a la paret). Actualitzat a la
-  // còpia de tic@ el 18/07/2026; el vell (1FAIpQLSepRkglU9...) ja no és a cap fitxer.
+  // URL de RESPOSTA del formulari d'incidències (enllaç públic, l'app hi enllaça).
+  // Actualitzat a la còpia de tic@ el 18/07/2026; el vell (1FAIpQLSepRkglU9...) ja no és a cap fitxer.
   '1FAIpQLSecbKYBsSoSCGay2DSxSHNbGxX-1IXxX8z5sG8muoXTpzz2eQ',
-  // URL de RESPOSTA del formulari d'encàrrecs (QR a la paret)
+  // URL de RESPOSTA del formulari d'encàrrecs (enllaç públic, l'app hi enllaça)
   '1FAIpQLSfLdQD6-Lh6aHJ_Si0z1iUiYSjSjGEv7z2Jhdnd8iU-3B_GTQ',
 ];
 
