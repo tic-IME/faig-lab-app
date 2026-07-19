@@ -179,6 +179,15 @@ window.API = (function () {
         estat:       estat,
       });
     },
+    // Edició de les 7 columnes d'equip (vista de gestió, @60). Només ADMIN, validat
+    // al servidor. camps: { 'Padrí/padrina FAIG': ..., ..., 'Notes_FAIG': ... }.
+    // El backend rebutja amb 400 qualsevol clau fora de les 7 editables.
+    updateGestio(id, camps) {
+      return call('updateEncarrecGestio', {
+        encarrec_id: id,
+        camps:       camps,
+      });
+    },
   };
 
   // ── Inventari ──────────────────────────────────────────────

@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
-// Generada:  2026-07-18
-// Versió del web app desplegada en aquell moment:  @59
+// Generada:  2026-07-19
+// Versió del web app desplegada en aquell moment:  @60
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i

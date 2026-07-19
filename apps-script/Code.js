@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
-// Generada:  2026-07-18
-// Versió del web app desplegada en aquell moment:  @59
+// Generada:  2026-07-19
+// Versió del web app desplegada en aquell moment:  @60
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i
@@ -225,6 +225,7 @@ function routeAction(action, body, usuari) {
     case 'getEncarrecs':         return getEncarrecs(body, usuari);
     case 'getEncarrec':          return getEncarrec(body, usuari);
     case 'updateEstatEncarrec':  return updateEstatEncarrec(body, usuari);
+    case 'updateEncarrecGestio': return updateEncarrecGestio(body, usuari);
     case 'getInventari':         return getInventari();
     case 'registreConsum':       return registreConsum(body, usuari);
     case 'updateMaterial':       return updateMaterial(body, usuari);
@@ -1031,6 +1032,24 @@ function _escriuFilaPerNom(sheet, valors) {
   });
   SpreadsheetApp.flush();
   return fila;
+}
+
+// Actualitza camps d'una fila EXISTENT col·locant cada valor per NOM de capçalera.
+// Germà d'_escriuFilaPerNom, que només escriu fila NOVA. Resol amb _colsPerNom, o
+// sigui que peta sorollós (amb la llista de les que falten) si el full no té alguna
+// capçalera: mai escriu a cegues per posició.
+// colsText: subconjunt de claus que s'han d'escriure com a TEXT pla — setNumberFormat('@')
+// ABANS del setValue, per la lliçó de la Capa 1 (dates i marques de temps). La resta
+// es desa amb el format que ja tingui la cel·la.
+function _actualitzaFilaPerNom(sheet, fila, valors, colsText) {
+  var cols  = _colsPerNom(sheet, Object.keys(valors));
+  var texts = colsText || [];
+  Object.keys(valors).forEach(function (n) {
+    var cel = sheet.getRange(fila, cols[n]);
+    if (texts.indexOf(n) !== -1) cel.setNumberFormat('@');
+    cel.setValue(valors[n]);
+  });
+  SpreadsheetApp.flush();
 }
 
 // L'ID el posa l'usuari al formulari (#nou-id): NO se'l pot inventar el backend.

@@ -12,6 +12,24 @@ window.ModulEncarrecs = (function () {
   // Si canvien allà, han de canviar aquí.
   const ESTATS_ENC = ['Rebut', 'Acceptat', 'En producció', 'Llest', 'Entregat', 'Rebutjat'];
 
+  // Les 7 columnes d'EQUIP editables des del detall (@60). Els noms han de coincidir
+  // CARÀCTER A CARÀCTER amb ENCARREC_COLS_EQUIP del backend i amb les capçaleres del
+  // full (accents i barres inclosos): són alhora les claus de `gestio` per al prefill
+  // i les claus que el backend accepta a la llista blanca (qualsevol altra → 400).
+  const CAMPS_EQUIP = [
+    { nom: 'Padrí/padrina FAIG',    tipus: 'text' },
+    { nom: 'Alumnat especialitzat', tipus: 'text' },
+    { nom: 'Espai i reserva',       tipus: 'text' },
+    { nom: 'Data planificada',      tipus: 'date' },
+    { nom: 'Data feta',             tipus: 'date' },
+    { nom: 'Evidència',             tipus: 'text' },
+    { nom: 'Notes_FAIG',            tipus: 'textarea' },
+  ];
+  // Per treure aquestes 7 de la part de LECTURA del detall: al detall es mostren com a
+  // formulari editable, no com a text. La traça (Editat_Per, Data_Edicio) NO hi és:
+  // no és editable i ha de sortir a la part de lectura.
+  const NOMS_EQUIP = CAMPS_EQUIP.map(function (c) { return c.nom; });
+
   // Opcions del filtre. El valor buit és el que el backend entén com "no tancats":
   // ni Entregat ni Rebutjat. OJO: a diferència d'incidències, aquí hi ha DOS estats
   // terminals, no un.
@@ -200,21 +218,107 @@ window.ModulEncarrecs = (function () {
 
     const detall = document.createElement('tr');
     detall.className = 'fila-detall';
-    detall.innerHTML = '<td colspan="' + COLS_TAULA + '" style="' + CEL_DETALL + '">' +
-                       '<div class="spinner-wrap" style="min-height:60px;"><div class="spinner"></div></div></td>';
+    detall.innerHTML = _tdSpinner();
     tr.insertAdjacentElement('afterend', detall);
+    await _carregaDetall(detall, id);
+  }
 
+  function _tdSpinner() {
+    return '<td colspan="' + COLS_TAULA + '" style="' + CEL_DETALL + '">' +
+           '<div class="spinner-wrap" style="min-height:60px;"><div class="spinner"></div></div></td>';
+  }
+
+  // Carrega (amb cache) i pinta el detall dins la cel·la donada. La cache guarda la
+  // resposta SENCERA (camps + gestio): el detall porta la traça i els valors d'equip,
+  // i s'invalida en desar. Reutilitzat per refrescar el detall després d'una edició.
+  async function _carregaDetall(detall, id) {
     try {
       if (!_detalls[id]) {
-        const res = await API.encarrecs.get(id);
-        _detalls[id] = (res && res.camps) || [];
+        _detalls[id] = (await API.encarrecs.get(id)) || {};
       }
-      detall.innerHTML = '<td colspan="' + COLS_TAULA + '" style="' + CEL_DETALL + 'padding:.875rem;">' +
-                         _renderCamps(_detalls[id]) + '</td>';
+      const dades = _detalls[id];
+      // La part de LECTURA no repeteix els 7 camps d'equip (surten al formulari).
+      const lectura = (dades.camps || []).filter(function (c) {
+        return NOMS_EQUIP.indexOf(c.pregunta) === -1;
+      });
+      detall.innerHTML =
+        '<td colspan="' + COLS_TAULA + '" style="' + CEL_DETALL + 'padding:.875rem;">' +
+          _renderEdicio(id, dades.gestio || {}) +
+          _renderCamps(lectura) +
+        '</td>';
+      _viraEdicio(detall, id);
     } catch (err) {
       detall.innerHTML = '<td colspan="' + COLS_TAULA + '" style="' + CEL_DETALL + 'padding:.875rem;' +
                          'font-size:.82rem;color:var(--col-text-muted);">' +
                          'No s\'ha pogut carregar el detall: ' + _esc(err.message) + '</td>';
+    }
+  }
+
+  // Formulari dels 7 camps d'equip, prefillats des de `gestio`. Els dos camps de data
+  // són <input type="date">: prefill i retorn en 'YYYY-MM-DD' (o ''), exactament el
+  // text pla que espera el backend. Notes_FAIG ocupa tota l'amplada.
+  function _renderEdicio(id, gestio) {
+    const control = function (c) {
+      const val = gestio[c.nom] || '';
+      if (c.tipus === 'textarea') {
+        return '<textarea data-camp="' + _esc(c.nom) + '" rows="3" ' +
+               'style="width:100%;font-size:.85rem;padding:.4rem;resize:vertical;box-sizing:border-box;">' +
+               _esc(val) + '</textarea>';
+      }
+      return '<input data-camp="' + _esc(c.nom) + '" type="' + (c.tipus === 'date' ? 'date' : 'text') + '" ' +
+             'value="' + _esc(val) + '" ' +
+             'style="width:100%;font-size:.85rem;padding:.35rem .4rem;box-sizing:border-box;">';
+    };
+    const camp = function (c) {
+      const ample = c.tipus === 'textarea' ? 'grid-column:1/-1;' : '';
+      return '<label style="display:block;' + ample + '">' +
+               '<span style="display:block;font-size:.74rem;font-weight:600;color:var(--col-text-muted);' +
+               'margin-bottom:.2rem;">' + _esc(c.nom) + '</span>' +
+               control(c) +
+             '</label>';
+    };
+    return '<div class="enc-edicio" data-id="' + _esc(id) + '" style="margin-bottom:1.125rem;">' +
+             '<h4 style="font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
+             'color:var(--col-text-muted);margin:0 0 .6rem;">Gestió de l\'equip</h4>' +
+             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.6rem .875rem;">' +
+               CAMPS_EQUIP.map(camp).join('') +
+             '</div>' +
+             '<div style="display:flex;justify-content:flex-end;margin-top:.75rem;">' +
+               '<button class="btn-primary btn-desa-equip" data-id="' + _esc(id) + '" ' +
+               'style="font-size:.82rem;">Desa els camps de l\'equip</button>' +
+             '</div>' +
+           '</div>';
+  }
+
+  function _viraEdicio(detall, id) {
+    const btn = detall.querySelector('.btn-desa-equip');
+    if (btn) btn.addEventListener('click', function () { _desaEdicio(detall, id, btn); });
+  }
+
+  async function _desaEdicio(detall, id, btn) {
+    const cont  = detall.querySelector('.enc-edicio');
+    const camps = {};
+    CAMPS_EQUIP.forEach(function (c) {
+      // Cap dels 7 noms no porta cometes dobles: el selector d'atribut entre cometes
+      // dobles és segur amb barres, espais i accents.
+      const el = cont.querySelector('[data-camp="' + c.nom + '"]');
+      camps[c.nom] = el ? el.value : '';
+    });
+
+    btn.disabled = true;
+    const textOriginal = btn.textContent;
+    btn.textContent = 'Desant…';
+    try {
+      await API.encarrecs.updateGestio(id, camps);
+      Toast.ok('Camps de l\'equip desats (' + id + ').');
+      // El detall porta la traça i els valors: la cache queda obsoleta.
+      delete _detalls[id];
+      detall.innerHTML = _tdSpinner();
+      await _carregaDetall(detall, id);
+    } catch (err) {
+      Toast.error('Error desant els camps: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = textOriginal;
     }
   }
 

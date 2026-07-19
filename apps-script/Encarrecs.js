@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // INSTANTÀNIA — AIXÒ NO ÉS LA FONT DE VERITAT.
 //
-// Generada:  2026-07-18
-// Versió del web app desplegada en aquell moment:  @59
+// Generada:  2026-07-19
+// Versió del web app desplegada en aquell moment:  @60
 //
 // La FONT DE VERITAT del backend és el projecte viu de Google Apps Script.
 // Aquest fitxer és una còpia datada per poder llegir i replicar el codi, i
@@ -82,6 +82,26 @@ const ENCARREC_COLS_GESTIO = [
   'Evidència',
   'Notes_FAIG',
 ];
+
+// ===== FASE 3 (@60): EDICIÓ DELS CAMPS D'EQUIP DES DE L'APP =====
+// Les 7 columnes que l'equip omple a mà i que ARA són editables des de la vista de
+// gestió. Derivades de ENCARREC_COLS_GESTIO (= gestió MENYS les 4 del sistema): si
+// algú hi afegeix una columna de sistema, no cal mantenir dues llistes en paral·lel.
+// Són l'ÚNICA llista blanca: updateEncarrecGestio rebutja amb 400 qualsevol clau que
+// no hi sigui (formulari, les 4 del sistema i les 2 de traça queden fora).
+const ENCARREC_COLS_EQUIP = ENCARREC_COLS_GESTIO.slice(4);
+
+// Subconjunt d'equip que són DATES: s'escriuen com a TEXT pla 'YYYY-MM-DD' amb un
+// setNumberFormat('@') PREVI. Lliçó de la Capa 1: escriure '2026-09-15' en una cel·la
+// sense format text la converteix en data real i trenca lectura i comparació.
+const ENCARREC_COLS_EQUIP_DATA = ['Data planificada', 'Data feta'];
+
+// TRAÇA D'EDICIÓ (decisió b, @60): les escriu SEMPRE el servidor en cada desament
+// correcte i MAI el client (dins camps → 400, com 'Estat'). Cadenes LITERALS del full
+// verificades per l'Anna: 'Data_Edicio' va SENSE accent a posta. Data_Edicio es
+// desa com a text pla (marca de temps), igual que les dates d'equip.
+const ENCARREC_COL_EDITAT_PER  = 'Editat_Per';
+const ENCARREC_COL_DATA_EDICIO = 'Data_Edicio';
 
 // ===== ADOPCIÓ DEL FORMULARI (executar des de l'editor web) =====
 // IDEMPOTENT: es pot tornar a executar sense por. Cada pas comprova si ja està fet
@@ -574,10 +594,41 @@ function getEncarrec(body, usuari) {
       if (pregunta === '' || resposta === '') continue;
       camps.push({ pregunta: pregunta, resposta: resposta });
     }
-    return jsonResponse({ id: id, camps: camps });
+
+    // Bloc d'EQUIP per al prefill del formulari d'edició (@60): els 7 camps SEMPRE,
+    // buits inclosos (a `camps` es salten les respostes buides, però el formulari els
+    // necessita tots). Localitzat per nom: 500 sorollós si en falta cap.
+    // Les 2 columnes de DATA es serialitzen amb _encarrecValorData (zona de l'script,
+    // 'yyyy-MM-dd'), NO amb toISOString: una data real de mitjanit a Madrid en UTC
+    // cauria al dia anterior i el prefill mostraria el dia equivocat.
+    var gestio = {};
+    try {
+      var colsEquip = _colsPerNom(sheet, ENCARREC_COLS_EQUIP);
+      ENCARREC_COLS_EQUIP.forEach(function (n) {
+        var raw = fila[colsEquip[n] - 1];
+        gestio[n] = ENCARREC_COLS_EQUIP_DATA.indexOf(n) !== -1
+          ? _encarrecValorData(raw)
+          : _incidenciaValorText(raw);
+      });
+    } catch (err) {
+      return errorResponse(err.message, 500);
+    }
+
+    return jsonResponse({ id: id, camps: camps, gestio: gestio });
   }
 
   return errorResponse('Encàrrec no trobat: ' + id, 404);
+}
+
+// Serialitza un valor de columna de DATA d'equip per al prefill, SEGUR davant la zona
+// horària. _incidenciaValorText fa toISOString() (UTC) i desplaçaria una data de
+// mitjanit a Madrid al dia anterior. El text 'YYYY-MM-DD' ja desat passa tal qual.
+function _encarrecValorData(v) {
+  if (v instanceof Date) {
+    return isNaN(v.getTime()) ? '' :
+      Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return _incidenciaValorText(v);
 }
 
 // Canvi d'estat del cicle de vida de l'encàrrec.
@@ -624,6 +675,98 @@ function updateEstatEncarrec(body, usuari) {
       sheet.getRange(fila, cols.gestionat).setValue(usuari.email);
       SpreadsheetApp.flush();
       return jsonResponse({ updated: true, encarrec_id: id, estat: nouEstat });
+    }
+
+    return errorResponse('Encàrrec no trobat: ' + id, 404);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Edició de les 7 columnes d'EQUIP des de la vista de gestió (@60). NOMÉS ADMIN,
+// validat AL SERVIDOR. El principi del projecte: "el full és per llegir i reparar;
+// per gestionar, l'app". La gestió d'encàrrecs n'era l'única excepció gran; això la
+// tanca.
+//
+// ESCRIPTURA PER NOM DE CAPÇALERA (_actualitzaFilaPerNom → _colsPerNom), MAI per
+// posició: les capçaleres porten espais i barres ('Padrí/padrina FAIG', 'Espai i
+// reserva') i un desplaçament silenciós ompliria columnes equivocades per sempre.
+// Si en falta cap, 500 sorollós amb la llista.
+//
+// LLISTA BLANCA DURA: qualsevol clau de body.camps fora d'ENCARREC_COLS_EQUIP → 400.
+// Així les 15 del formulari, les 4 del sistema (ID_Encarrec, Estat, Data_Canvi_Estat,
+// Gestionat_Per) i les 2 de traça queden fora encara que el client n'enviï de més.
+//
+// TRAÇA (decisió b): en cada desament CORRECTE s'escriuen Editat_Per (correu de
+// l'admin autenticat, del token — no del client) i Data_Edicio (marca de temps, text
+// pla). Un intent fallit (400/403/404/500) NO les toca: s'escriuen dins el bloc
+// d'èxit, sota lock, un cop localitzada la fila i validat tot.
+//
+// LAST-WRITE-WINS acceptat i registrat: el lock serialitza (cap fila a mitges) però
+// NO hi ha control optimista de concurrència. Dos admins sobre el MATEIX encàrrec:
+// l'últim que desa sobreescriu els camps de l'altre en bloc. Amb equip de 8 i
+// col·lisions improbables, assumit; la traça (b) hi actua com a control compensatori
+// (queda escrit qui ha estat l'últim a tocar-lo i quan).
+function updateEncarrecGestio(body, usuari) {
+  if (usuari.nivell !== 'ADMIN') return errorResponse('Sense permisos', 403);
+
+  var id = String((body && body.encarrec_id) || '').trim();
+  if (!id) return errorResponse('Falta encarrec_id', 400);
+
+  var camps = (body && body.camps) || {};
+  if (typeof camps !== 'object' || Array.isArray(camps)) {
+    return errorResponse('camps ha de ser un objecte {capçalera: valor}', 400);
+  }
+
+  var claus = Object.keys(camps);
+  var noPermeses = claus.filter(function (k) { return ENCARREC_COLS_EQUIP.indexOf(k) === -1; });
+  if (noPermeses.length > 0) {
+    return errorResponse('Columna no editable: ' + noPermeses.join(', ') +
+                         '. Només es poden editar: ' + ENCARREC_COLS_EQUIP.join(', '), 400);
+  }
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (err) {
+    return errorResponse('El sistema està ocupat, torna-ho a provar en uns segons.', 503);
+  }
+
+  try {
+    var sheet = getSheet(ENCARREC_FULL);
+
+    var colId;
+    try {
+      colId = _colsPerNom(sheet, ['ID_Encarrec'])['ID_Encarrec'];
+    } catch (err) {
+      return errorResponse(err.message, 500);
+    }
+
+    // Localitzem la fila per ID sobre valors crus, MAI per número de fila.
+    var valors = sheet.getDataRange().getValues();
+    for (var f = 1; f < valors.length; f++) {
+      if (String(valors[f][colId - 1] || '').trim() !== id) continue;
+
+      var fila = f + 1; // getValues és 0-indexat; els rangs del full, 1-indexats
+
+      // Camps rebuts (normalitzats a text) + la traça, sempre.
+      var aEscriure = {};
+      claus.forEach(function (k) {
+        aEscriure[k] = String(camps[k] === null || camps[k] === undefined ? '' : camps[k]);
+      });
+      aEscriure[ENCARREC_COL_EDITAT_PER]  = usuari.email;
+      aEscriure[ENCARREC_COL_DATA_EDICIO] = Utilities.formatDate(
+        new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
+      // Text pla: les dues dates d'equip i la marca de temps de traça.
+      var colsText = ENCARREC_COLS_EQUIP_DATA.concat([ENCARREC_COL_DATA_EDICIO]);
+
+      try {
+        _actualitzaFilaPerNom(sheet, fila, aEscriure, colsText);
+      } catch (err) {
+        return errorResponse(err.message, 500);
+      }
+      return jsonResponse({ updated: true, encarrec_id: id });
     }
 
     return errorResponse('Encàrrec no trobat: ' + id, 404);
